@@ -1,0 +1,1679 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+<script src="firebase-config.js"></script>
+<script>if(!firebase.apps.length){firebase.initializeApp(firebaseConfig);}</script>
+<script src="att-data.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reports — Attendance</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{--accent:#6c63ff;--accent2:#ff6584;--green:#00c9a7;--amber:#ffb347;--purple:#7c3aed;--card-r:14px;}
+[data-theme="light"]{--bg:#f3f4f8;--surface:#ffffff;--border:#e5e7eb;--text:#111827;--muted:#6b7280;--row-hover:#f5f8ff;--input-bg:#f9fafb;--th-bg:#f9fafb;--foot-bg:#f9fafb;--pill-bg:#eff6ff;--pill-txt:#1d4ed8;--panel-bg:#ffffff;--overlay:rgba(0,0,0,.3);}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:15px;transition:background .25s,color .25s;}
+
+/* Header */
+.header{background:var(--surface);border-bottom:1px solid var(--border);padding:18px 36px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10;transition:background .25s,border-color .25s;}
+.header-left{
+    flex:1;
+    display:flex;
+    align-items:center;
+    gap:16px;
+}
+.header-center{
+    flex:1;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+}
+
+.header-center img{
+    height:55px;
+    width:auto;
+    object-fit:contain;
+}
+
+.header-right{
+    flex:1;
+    display:flex;
+    justify-content:flex-end;
+    align-items:center;
+}
+.btn-back{display:flex;align-items:center;gap:6px;padding:8px 14px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--muted);font-size:13px;font-family:'Inter',sans-serif;cursor:pointer;transition:all .15s;text-decoration:none;}
+.btn-back:hover{border-color:var(--accent);color:var(--text);}
+.header-title h1{font-family:'Space Grotesk',sans-serif;font-size:21px;font-weight:700;background:linear-gradient(90deg,#6c63ff,#ff6584);-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+.header-title p{color:var(--muted);font-size:13px;margin-top:3px;}
+
+/* Mode tabs */
+.tabs{display:flex;gap:0;padding:20px 36px 0;}
+.tab{padding:10px 24px;font-size:14px;font-weight:500;border:1px solid var(--border);cursor:pointer;background:var(--surface);color:var(--muted);transition:all .15s;}
+.tab:first-child{border-radius:8px 0 0 8px;}
+.tab:last-child{border-radius:0 8px 8px 0;}
+.tab:not(:first-child){border-left:none;}
+.tab.active-all{background:#6c63ff;color:#fff;border-color:#6c63ff;}
+.tab.active-face{background:#6c63ff;color:#fff;border-color:#6c63ff;}
+.tab.active-fingerprint{background:#00c9a7;color:#fff;border-color:#00c9a7;}
+.tab.active-greathr{background:#7c3aed;color:#fff;border-color:#7c3aed;}
+.tab:not([class*="active"]):hover{color:var(--text);}
+.tabs.tabs-disabled{opacity:.4;pointer-events:none;}
+
+/* Filter panel */
+.filter-panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--card-r);margin:20px 36px 0;padding:22px 24px;}
+.filter-panel h2{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;margin-bottom:16px;display:flex;align-items:center;gap:8px;}
+.filter-panel h2 span{width:8px;height:8px;border-radius:50%;background:var(--accent);display:inline-block;}
+.filter-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;}
+.filter-group{display:flex;flex-direction:column;gap:5px;}
+.filter-group label{font-size:12px;color:var(--muted);font-weight:500;text-transform:uppercase;letter-spacing:.05em;}
+.filter-group input,
+.filter-group select{height:38px;background:var(--input-bg);border:1px solid var(--border);color:var(--text);padding:0 12px;border-radius:8px;font-size:14px;outline:none;font-family:'Inter',sans-serif;transition:border-color .15s,background .25s;}
+.filter-group input:focus,.filter-group select:focus{border-color:var(--accent);}
+.filter-group input::placeholder{color:var(--muted);}
+.filter-group select option{background:var(--surface);}
+input[type="date"]::-webkit-calendar-picker-indicator,input[type="time"]::-webkit-calendar-picker-indicator{cursor:pointer;}
+
+/* Flag checkboxes */
+.flags-wrap{display:flex;flex-wrap:wrap;gap:16px;padding:8px 0 2px;}
+.flag-check{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--text);font-weight:400;text-transform:none;letter-spacing:normal;cursor:pointer;background:var(--input-bg);border:1px solid var(--border);border-radius:8px;padding:8px 14px;transition:border-color .15s;}
+.flag-check:hover{border-color:var(--accent);}
+.flag-check input{cursor:pointer;width:15px;height:15px;accent-color:var(--accent);}
+
+/* Report description */
+.report-desc{margin-top:14px;padding:10px 14px;background:rgba(108,99,255,.07);border:1px solid rgba(108,99,255,.2);border-radius:8px;font-size:13px;color:var(--muted);line-height:1.5;display:flex;align-items:center;gap:8px;}
+.report-desc.placeholder{background:rgba(255,255,255,.03);border-color:var(--border);font-style:italic;}
+.report-desc-icon{font-size:15px;flex-shrink:0;}
+[data-theme="light"] .report-desc{background:rgba(108,99,255,.05);border-color:rgba(108,99,255,.15);}
+[data-theme="light"] .report-desc.placeholder{background:rgba(0,0,0,.02);border-color:var(--border);}
+
+/* Threshold row */
+.threshold-row{margin-top:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.threshold-row label{font-size:13px;color:var(--muted);font-weight:500;}
+.threshold-row input{height:38px;width:90px;background:var(--input-bg);border:1px solid var(--border);color:var(--text);padding:0 12px;border-radius:8px;font-size:14px;outline:none;font-family:'Inter',sans-serif;}
+.threshold-row input:focus{border-color:var(--accent);}
+.threshold-row span{font-size:13px;color:var(--muted);}
+.threshold-row select{height:38px;background:var(--input-bg);border:1px solid var(--border);color:var(--text);padding:0 12px;border-radius:8px;font-size:14px;outline:none;font-family:'Inter',sans-serif;}
+.threshold-row select:focus{border-color:var(--accent);}
+
+/* Action buttons */
+.action-row{display:flex;gap:12px;margin-top:20px;align-items:center;flex-wrap:wrap;}
+.btn-generate{height:42px;padding:0 28px;background:var(--accent);border:none;color:#fff;border-radius:8px;font-size:14px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer;transition:opacity .15s;}
+.btn-generate:hover{opacity:.88;}
+.btn-generate:disabled{opacity:.38;cursor:not-allowed;}
+.btn-export{height:42px;padding:0 20px;background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:8px;font-size:14px;font-family:'Inter',sans-serif;cursor:pointer;transition:all .15s;display:none;}
+.btn-export:hover{border-color:var(--green);color:var(--green);}
+.btn-clear{height:42px;padding:0 16px;background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:8px;font-size:14px;font-family:'Inter',sans-serif;cursor:pointer;transition:all .15s;}
+.btn-clear:hover{border-color:var(--accent);color:var(--text);}
+.report-type-select{height:42px;padding:0 12px;background:var(--input-bg);border:1px solid var(--border);color:var(--text);border-radius:8px;font-size:14px;font-family:'Inter',sans-serif;outline:none;min-width:240px;cursor:pointer;}
+.report-type-select:focus{border-color:var(--accent);}
+.report-type-select option{background:var(--surface);color:var(--text);padding:10px;font-weight:500;}
+.report-type-select optgroup{background:var(--surface);color:var(--text);font-weight:700;}
+.report-type-select.unselected{color:var(--muted);}
+
+/* Results */
+.results-section{margin:20px 36px 40px;}
+
+/* ── Report info header ── */
+.report-info-header{background:var(--surface);border:1px solid var(--border);border-radius:var(--card-r);padding:18px 22px;margin-bottom:16px;}
+.rih-top{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;}
+.rih-title{font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;}
+.rih-ts{font-size:12px;color:var(--muted);margin-top:3px;}
+.rih-meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;}
+.rih-tag{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:4px;background:var(--th-bg);border:1px solid var(--border);font-size:12px;color:var(--muted);}
+.rih-tag strong{color:var(--text);font-weight:600;}
+
+/* ── Export action buttons ── */
+.export-action-row{display:flex;gap:8px;flex-wrap:wrap;}
+.btn-exp{height:34px;padding:0 14px;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--muted);font-size:12px;font-weight:500;font-family:'Inter',sans-serif;cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:5px;white-space:nowrap;}
+.btn-exp:hover{color:var(--text);border-color:var(--muted);}
+.btn-exp.excel:hover{border-color:var(--green);color:var(--green);}
+.btn-exp.csv:hover{border-color:var(--amber);color:var(--amber);}
+.btn-exp.print:hover{border-color:var(--accent);color:var(--accent);}
+
+/* ── Summary cards ── */
+.summary-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(145px,1fr));gap:12px;margin-bottom:16px;}
+.s-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--card-r);padding:14px 16px;position:relative;overflow:hidden;transition:background .25s,border-color .25s,transform .18s ease,box-shadow .18s ease;}
+.s-card:hover{transform:translateY(-2px);box-shadow:0 6px 18px rgba(0,0,0,.15);}
+.s-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--c,var(--accent));}
+.s-card .sc-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;}
+.s-card .sc-val{font-size:26px;font-weight:700;margin-top:6px;color:var(--c,var(--accent));font-family:'Space Grotesk',sans-serif;line-height:1;}
+.s-card .sc-sub{font-size:11px;color:var(--muted);margin-top:4px;}
+
+/* Results header */
+.results-header{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:12px;}
+.results-title{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;}
+.results-controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+.results-controls input,.results-controls select{height:36px;background:var(--input-bg);border:1px solid var(--border);color:var(--text);padding:0 12px;border-radius:8px;font-size:13px;outline:none;font-family:'Inter',sans-serif;}
+.results-controls input:focus,.results-controls select:focus{border-color:var(--accent);}
+.results-controls input::placeholder{color:var(--muted);}
+.count-pill{font-size:13px;color:var(--pill-txt);background:var(--pill-bg);padding:4px 14px;border-radius:20px;font-weight:500;white-space:nowrap;}
+
+/* Table */
+.table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--card-r);overflow:hidden;}
+table{width:100%;border-collapse:collapse;}
+thead tr{background:var(--th-bg);border-bottom:2px solid var(--border);}
+thead th{padding:12px 16px;text-align:left;font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;white-space:nowrap;}
+thead th.sortable{cursor:pointer;user-select:none;transition:color .15s;}
+thead th.sortable:hover{color:var(--text);}
+.sort-ind{font-size:10px;margin-left:3px;color:var(--accent);letter-spacing:0;}
+tbody tr{border-bottom:1px solid var(--border);transition:background .1s;}
+tbody tr:last-child{border-bottom:none;}
+tbody tr:hover{background:var(--row-hover);}
+tbody td{padding:12px 16px;font-size:14px;vertical-align:middle;}
+.emp-name{font-weight:600;transition:color .15s;}
+tbody tr:hover .emp-name{color:var(--accent);}
+.t-in{color:var(--green);font-weight:600;}
+.t-out{color:var(--accent2);font-weight:600;}
+.badge{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:4px;font-size:11px;font-weight:600;transition:transform .18s ease;}
+tbody tr:hover .badge{transform:translateY(-1px);}
+.badge::before{content:'';width:5px;height:5px;border-radius:50%;flex-shrink:0;}
+.badge-full{background:rgba(0,201,167,.12);color:var(--green);}.badge-full::before{background:var(--green);}
+.badge-half{background:rgba(255,179,71,.12);color:var(--amber);}.badge-half::before{background:var(--amber);}
+.badge-short{background:rgba(255,101,132,.12);color:var(--accent2);}.badge-short::before{background:var(--accent2);}
+.mode-pill{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;}
+.mode-face{background:rgba(108,99,255,.15);color:#a89fff;}
+.mode-fp{background:rgba(0,201,167,.15);color:var(--green);}
+.mode-ghr{background:rgba(124,58,237,.15);color:#c084fc;}
+.mode-all{background:rgba(255,179,71,.15);color:var(--amber);}
+.reason-pill{
+    display:inline-block;
+    padding:3px 9px;
+    border-radius:4px;
+    font-size:11px;
+    font-weight:600;
+    margin:2px;
+    white-space:nowrap;
+}
+
+.reason-late{
+    background:#fff3cd;
+    color:#b45309;
+}
+
+.reason-early{
+    background:#dcfce7;
+    color:#15803d;
+}
+
+.reason-overtime{
+    background:#dbeafe;
+    color:#1d4ed8;
+}
+
+.reason-insufficient{
+    background:#fee2e2;
+    color:#dc2626;
+}
+
+.reason-missing{
+    background:#ede9fe;
+    color:#7c3aed;
+}
+.tfoot-row{padding:10px 16px;background:var(--foot-bg);border-top:1px solid var(--border);font-size:13px;color:var(--muted);}
+
+/* ── Better empty state ── */
+.empty-state{text-align:center;padding:56px 36px;}
+.empty-state .es-icon{font-size:42px;margin-bottom:16px;opacity:.6;}
+.empty-state .es-title{font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:700;color:var(--text);margin-bottom:8px;}
+.empty-state .es-sub{font-size:14px;color:var(--muted);margin-bottom:20px;}
+.empty-state .es-tips{display:inline-flex;flex-direction:column;gap:7px;text-align:left;}
+.empty-state .es-tip{font-size:13px;color:var(--muted);display:flex;align-items:center;gap:7px;}
+.empty-state .es-tip::before{content:'';width:4px;height:4px;border-radius:50%;background:var(--muted);flex-shrink:0;}
+
+.idle-hint{text-align:center;padding:60px 36px;color:var(--muted);font-size:14px;}
+
+/* Print styles */
+@media print {
+  .header,.tabs,.filter-panel,.action-row,.results-controls,.export-action-row,.btn-exp{display:none!important;}
+  body{background:#fff;color:#000;}
+  .results-section{margin:0;}
+  .report-info-header,.summary-cards,.table-wrap{border:1px solid #ddd;}
+  .s-card{border:1px solid #ddd;}
+}
+
+/* ── Panel ── */
+.overlay{display:none;position:fixed;inset:0;background:var(--overlay);z-index:100;}
+.overlay.open{display:block;}
+.panel{position:fixed;top:0;right:-580px;width:560px;height:100vh;background:var(--panel-bg);border-left:1px solid var(--border);z-index:101;overflow-y:auto;transition:right .3s cubic-bezier(.4,0,.2,1);display:flex;flex-direction:column;}
+.panel.open{right:0;}
+.panel-header{padding:20px 24px 16px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;justify-content:space-between;position:sticky;top:0;background:var(--panel-bg);z-index:1;}
+.panel-header h2{font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:700;}
+.ph-sub{font-size:13px;color:var(--muted);margin-top:3px;}
+.btn-close{width:32px;height:32px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--muted);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;line-height:1;flex-shrink:0;margin-left:12px;}
+.btn-close:hover{color:var(--text);border-color:var(--muted);}
+.panel-body{padding:20px 24px;flex:1;}
+.panel-emp-header{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px 18px;margin-bottom:14px;}
+.panel-emp-name{font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:700;}
+.panel-emp-id{font-size:13px;color:var(--muted);margin-top:3px;}
+.panel-mode-pills{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;}
+.mode-pill-panel{display:inline-block;padding:3px 10px;border-radius:4px;font-size:12px;font-weight:600;}
+.panel-stat-row{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;}
+.panel-stat{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;text-align:center;}
+.ps-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;}
+.ps-val{font-size:20px;font-weight:700;margin-top:5px;}
+.panel-section-title{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;}
+.panel-day-label{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;color:var(--text);margin-bottom:14px;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;}
+.panel-table-wrap{border:1px solid var(--border);border-radius:10px;overflow:hidden;}
+.panel-table{width:100%;border-collapse:collapse;font-size:13px;}
+.panel-table thead tr{background:var(--th-bg);border-bottom:1px solid var(--border);}
+.panel-table thead th{padding:10px 12px;text-align:left;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;}
+.panel-table tbody tr{border-bottom:1px solid var(--border);}
+.panel-table tbody tr:last-child{border-bottom:none;}
+.panel-table tbody tr:hover{background:var(--row-hover);}
+.panel-table tbody td{padding:10px 12px;}
+.panel-foot{padding:8px 12px;background:var(--foot-bg);border-top:1px solid var(--border);font-size:12px;color:var(--muted);}
+.punch-in{color:var(--green);font-weight:600;}
+.punch-out{color:var(--accent2);font-weight:600;}
+
+</style>
+</head>
+<body>
+
+<div class="header">
+
+  <div class="header-left">
+    <a class="btn-back" href="index.html">← Back</a>
+
+    <div class="header-title">
+      <h1>Reports</h1>
+      <p>Generate HR attendance reports across all modes</p>
+    </div>
+  </div>
+
+  <div class="header-center">
+    <img src="images/orisenc-logo.png" alt="Orisenc Technologies">
+  </div>
+
+  <div class="header-right">
+  </div>
+
+</div>
+
+<!-- Mode tabs -->
+<div class="tabs" id="modeTabsReports">
+  <div class="tab active-all" id="tab-all"         onclick="switchMode('all')">🔀 All</div>
+  <div class="tab"            id="tab-face"        onclick="switchMode('face')">👤 Face</div>
+  <div class="tab"            id="tab-fingerprint" onclick="switchMode('fingerprint')">🖐 Fingerprint</div>
+  <div class="tab"            id="tab-greathr"     onclick="switchMode('greathr')">📱 Great HR</div>
+</div>
+
+<!-- Filter panel -->
+<div class="filter-panel">
+  <h2><span></span>Report Configuration</h2>
+
+  <div class="filter-grid">
+
+    <!-- Attendance Flags — multi-select, combines into one report -->
+    <div class="filter-group" style="grid-column:1/-1">
+      <label>Attendance Flags — select one or more (combined into a single report with a Reason column)</label>
+      <div class="flags-wrap">
+        <label class="flag-check"><input type="checkbox" class="flag-cb" value="late_login" onchange="onFlagsChange()"> Late Login</label>
+        <label class="flag-check"><input type="checkbox" class="flag-cb" value="early_login" onchange="onFlagsChange()"> Early Login</label>
+        <label class="flag-check"><input type="checkbox" class="flag-cb" value="overtime" onchange="onFlagsChange()"> Overtime</label>
+        <label class="flag-check"><input type="checkbox" class="flag-cb" value="insufficient_hours" onchange="onFlagsChange()"> Insufficient Hours</label>
+        <label class="flag-check"><input type="checkbox" class="flag-cb" value="missing_checkout" onchange="onFlagsChange()"> Missing Checkout</label>
+        <label class="flag-check"><input type="checkbox" class="flag-cb" value="absent" onchange="onFlagsChange()"> Absent</label>
+      </div>
+    </div>
+
+    <!-- Flag-specific thresholds (shown only when relevant flag is checked) -->
+    <div class="filter-group" id="flagThreshLateLogin" style="display:none">
+      <label>Late Login After</label>
+      <input type="time" id="threshLateLoginTime" value="09:45">
+    </div>
+    <div class="filter-group" id="flagThreshEarlyLogin" style="display:none">
+      <label>Early Login Before</label>
+      <input type="time" id="threshEarlyLoginTime" value="09:30">
+    </div>
+    <div class="filter-group" id="flagThreshFullHours" style="display:none">
+      <label>Full Day Hours (Weekday / Sat)</label>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <input type="number" id="threshFullWeekday" value="8" min="0" max="24" step="0.5" style="width:70px;">
+        <span style="font-size:12px;color:var(--muted)">/</span>
+        <input type="number" id="threshFullSat" value="4" min="0" max="24" step="0.5" style="width:70px;">
+      </div>
+    </div>
+    <!-- Other Reports — structurally different aggregate reports, kept single-select -->
+    <div class="filter-group" style="grid-column:span 2">
+      <label>Other Report Type</label>
+      <select id="reportType" class="report-type-select unselected" onchange="onReportTypeChange()" style="height:38px;max-width:100%;">
+        <option value="" selected>None — use Attendance Flags above</option>
+        <optgroup label="Attendance">
+          <option value="summary">Attendance Summary</option>
+        </optgroup>
+        <optgroup label="Exceptions">
+          <option value="single_punch">Single Punch</option>
+          <option value="fp_without_face">Fingerprint Without Face/Great HR</option>
+          <option value="face_without_fp">Face/Great HR Without Fingerprint</option>
+          <option value="duplicate_punch">Duplicate Punch</option>
+          <option value="multiple_punch">Multiple Punch</option>
+        </optgroup>
+        <optgroup label="Analytics">
+          <option value="attendance_pattern">Attendance Pattern</option>
+          <option value="source_comparison">Attendance Source Comparison</option>
+        </optgroup>
+      </select>
+    </div>
+
+    <div class="filter-group">
+      <label>Employee ID</label>
+      <input type="text" id="fEmpId" placeholder="e.g. 054">
+    </div>
+    <div class="filter-group">
+      <label>Employee Name</label>
+      <input type="text" id="fEmpName" placeholder="Search name…">
+    </div>
+    <div class="filter-group">
+      <label>Team</label>
+      <select id="teamFilterReports">
+        <option value="">All Teams</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>Month</label>
+      <select id="monthFilterReports">
+        <option value="">All Months</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>From Date</label>
+      <input type="date" id="fDateFrom">
+    </div>
+    <div class="filter-group">
+      <label>To Date</label>
+      <input type="date" id="fDateTo">
+    </div>
+  </div>
+
+  <!-- Report description -->
+  <div class="report-desc placeholder" id="reportDesc">
+    <span class="report-desc-icon">💡</span>
+    <span id="reportDescText">Select a report above to see its description.</span>
+  </div>
+
+  <!-- Threshold row (Other Reports: duplicate/multiple punch) -->
+  <div class="threshold-row" id="thresholdRow" style="display:none;">
+    <label id="thresholdLabel">Threshold</label>
+    <input type="number" id="thresholdSeconds" value="30" min="1" max="3600" step="1" style="display:none;">
+    <input type="number" id="thresholdPunches" value="8" min="1" max="100" step="1" style="display:none;">
+    <span id="thresholdUnit"></span>
+  </div>
+
+  <div class="action-row">
+    <button class="btn-generate" id="btnGenerate" onclick="generateReport()" disabled>⚡ Generate Report</button>
+    <button class="btn-clear" onclick="clearAll()">✕ Clear</button>
+  </div>
+</div>
+
+<!-- Results -->
+<div class="results-section" id="resultsSection" style="display:none;">
+
+  <!-- Report info header -->
+  <div class="report-info-header" id="reportInfoHeader">
+    <div class="rih-top">
+      <div>
+        <div class="rih-title" id="rihTitle">—</div>
+        <div class="rih-ts" id="rihTs">—</div>
+      </div>
+      <div class="export-action-row">
+        <button class="btn-exp excel" onclick="exportExcel()">📊 Excel</button>
+        <button class="btn-exp print" onclick="printReport()">🖨 Print</button>
+      </div>
+    </div>
+    <div class="rih-meta" id="rihMeta"></div>
+  </div>
+
+  <!-- Summary cards -->
+  <div class="summary-cards" id="summaryCards"></div>
+
+  <div class="results-header">
+    <div class="results-title" id="resultsTitle">Report Results</div>
+    <div class="results-controls">
+      <input type="text" id="resSearch" placeholder="🔍 Filter results…" oninput="filterResults()">
+      <span style="font-size:13px;color:var(--muted);font-weight:500;">Top</span>
+      <input type="number" id="rankTop" placeholder="All" min="0" step="1" style="width:72px;" oninput="filterResults()">
+      <span class="count-pill" id="resCount">—</span>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead id="resHead"></thead>
+      <tbody id="resTbody"></tbody>
+    </table>
+    <div class="tfoot-row" id="resFoot">—</div>
+  </div>
+</div>
+
+<div class="idle-hint" id="idleHint">Configure report settings above and click <strong>Generate Report</strong></div>
+
+<script>
+/* ── Data ── */
+let faceData=[], fpData=[], ghrData=[];
+let teamLookup={byId:{}, byName:{}};
+let employeeMaster=[];
+let currentMode="all";
+let reportRows=[];
+let filteredRows=[];
+let currentReportType="";
+
+const FLAG_LABELS={
+  late_login:"Late Login", early_login:"Early Login", overtime:"Overtime",
+  insufficient_hours:"Insufficient Hours", missing_checkout:"Missing Checkout", absent:"Absent"
+};
+
+/* ── Report descriptions ── */
+const REPORT_DESC={
+  summary:            "Overall attendance, hours and punch statistics per employee.",
+  absent:             "Employees with zero punches across Face, Fingerprint and Great HR on working days. Sundays are always excluded.",
+  single_punch:       "Days where only a single punch was recorded — likely a missing check-in or check-out.",
+  fp_without_face:    "Employees with Fingerprint punches but no Face/Great HR punch on the same day.",
+  face_without_fp:    "Employees with Face/Great HR punches but no Fingerprint punch on the same day.",
+  duplicate_punch:    "Detects consecutive punches within a configurable short interval — likely accidental double-taps.",
+  multiple_punch:     "Employees with more than the configured number of punches in a single day.",
+  attendance_pattern: "Per-employee summary showing average login, logout, hours and punches across the selected period.",
+  source_comparison:  "Side-by-side breakdown of attendance days recorded across Face, Fingerprint and Great HR sources.",
+};
+
+/* ── Column sorting (replaces old Sort dropdown) ──
+   Only these 4 conceptual columns are ever sortable: Employee, Date, Hours, Punches.
+   Not every report type has all four — SORT_CONFIG maps each report type's actual
+   column(s) to the sort key, and is null/false where that concept doesn't exist. */
+const SORT_CONFIG = {
+  flags_combined:     { employee:true, date:true,  hours:r=>r._officialHours==="—"?0:(r._officialHours||0), punches:null },
+  summary:            { employee:true, date:false, hours:r=>parseFloat(r.avgH)||0, punches:r=>r.punches||0 },
+  absent:             { employee:true, date:true,  hours:null, punches:null },
+  single_punch:       { employee:true, date:true,  hours:null, punches:null },
+  fp_without_face:    { employee:true, date:true,  hours:r=>r.Hours==="—"?0:(r.Hours||0), punches:r=>r._fpCount||0 },
+  face_without_fp:    { employee:true, date:true,  hours:r=>r.Hours==="—"?0:(r.Hours||0), punches:r=>r._faceCount||0 },
+  duplicate_punch:    { employee:true, date:true,  hours:null, punches:null },
+  multiple_punch:     { employee:true, date:true,  hours:r=>r._officialHours==="—"?0:(r._officialHours||0), punches:r=>r.Total_Punches||0 },
+  attendance_pattern: { employee:true, date:false, hours:r=>parseFloat(r.avgHours)||0, punches:r=>parseFloat(r.avgPunches)||0 },
+  source_comparison:  { employee:true, date:false, hours:null, punches:null },
+};
+
+/* Default sort applied each time a report is generated */
+const DEFAULT_SORT = {
+  flags_combined:     { column:'date', direction:'desc' },
+  summary:            { column:'employee', direction:'asc' },
+  absent:             { column:'date', direction:'desc' },
+  single_punch:       { column:'date', direction:'desc' },
+  fp_without_face:    { column:'date', direction:'desc' },
+  face_without_fp:    { column:'date', direction:'desc' },
+  duplicate_punch:    { column:'date', direction:'desc' },
+  multiple_punch:     { column:'date', direction:'desc' },
+  attendance_pattern: { column:'employee', direction:'asc' },
+  source_comparison:  { column:'employee', direction:'asc' },
+};
+
+let sortState = { column:'date', direction:'desc' };
+
+function setSort(column){
+  const cfg = SORT_CONFIG[currentReportType];
+  if(!cfg || !cfg[column]) return; // column not sortable for this report type
+  if(sortState.column === column){
+    sortState.direction = sortState.direction === 'asc' ? 'desc' : 'asc';
+  } else {
+    sortState.column = column;
+    sortState.direction = 'asc';
+  }
+  filterResults();
+}
+
+function updateSortIndicators(){
+  ['employee','date','hours','punches'].forEach(col=>{
+    const el = document.getElementById('sort-ind-'+col);
+    if(!el) return;
+    el.textContent = sortState.column === col ? (sortState.direction === 'asc' ? ' ▲' : ' ▼') : '';
+  });
+}
+
+/* Small helper to build a <th>, sortable only if the report type supports that column */
+function sortableTh(col, label){
+  const cfg = SORT_CONFIG[currentReportType];
+  if(cfg && cfg[col]){
+    return `<th class="sortable" data-sort="${col}" onclick="setSort('${col}')">${label}<span class="sort-ind" id="sort-ind-${col}"></span></th>`;
+  }
+  return `<th>${label}</th>`;
+}
+
+function compareRows(a,b){
+  const cfg = SORT_CONFIG[currentReportType];
+  const col = sortState.column;
+  if(!cfg || !col || !cfg[col]) return 0;
+  let cmp = 0;
+  if(col === 'employee'){
+    cmp = (a.Name||"").localeCompare(b.Name||"");
+  } else if(col === 'date'){
+    cmp = (a.Date||"").toString().localeCompare((b.Date||"").toString());
+  } else {
+    const fn = cfg[col];
+    cmp = (fn(a)||0) - (fn(b)||0);
+  }
+  return sortState.direction === 'desc' ? -cmp : cmp;
+}
+
+/* ── Load data ── */
+let punchData=[];
+Promise.all([
+  fetch("face_summary.json").then(r=>r.json()),
+  fetch("fingerprint_summary.json").then(r=>r.json()),
+  fetch("greathr_summary.json").then(r=>r.json()),
+  fetch("punch_details.json").then(r=>r.json()),
+  window.AttData ? window.AttData.getEmployeeMaster() : Promise.resolve([]),
+  window.AttData ? window.AttData.buildTeamLookup() : Promise.resolve({byId:{},byName:{}}),
+]).then(([f,fp,g,pd,em,tl])=>{
+  faceData=f;fpData=fp;ghrData=g;punchData=pd;employeeMaster=em;teamLookup=tl;
+  const sel=document.getElementById("teamFilterReports");
+  const teams=window.AttData?window.AttData.listTeams(teamLookup):[];
+  sel.innerHTML=`<option value="">All Teams</option>`+teams.map(t=>`<option value="${t}">${t}</option>`).join("");
+  populateMonthFilterReports();
+}).catch(()=>document.getElementById("idleHint").innerHTML="⚠ Could not load JSON files. Run python attendance.py first.");
+
+/* ── Month filter population (same pattern as index.html) ──
+   Built from all attendance datasets combined (Face + Fingerprint + GreatHR).
+   Value stored as "YYYY-MM", displayed as "MMM YYYY". */
+function formatMonthLabel(ym){
+  const [y,m] = ym.split("-").map(Number);
+  return new Date(y, m-1, 1).toLocaleDateString("en-IN",{month:"short",year:"numeric"});
+}
+function populateMonthFilterReports(){
+  const sel = document.getElementById("monthFilterReports");
+  const monthSet = new Set();
+  [...faceData, ...fpData, ...ghrData].forEach(r=>{
+    const d = (r.Date||"").toString().slice(0,10);
+    if(d.length===10) monthSet.add(d.slice(0,7));
+  });
+  const months = Array.from(monthSet).sort();
+  sel.innerHTML = `<option value="">All Months</option>` + months.map(ym=>`<option value="${ym}">${formatMonthLabel(ym)}</option>`).join("");
+}
+
+/* ── Date-range helpers (used by the Absent Employees report, which must
+   walk every working day in the selected range rather than just the days
+   that already have punch rows) ── */
+function formatLocalDate(d){
+  const y=d.getFullYear();
+  const m=String(d.getMonth()+1).padStart(2,"0");
+  const day=String(d.getDate()).padStart(2,"0");
+  return `${y}-${m}-${day}`;
+}
+function datesBetween(from, to){
+  const out=[];
+  if(!from||!to) return out;
+  let d=new Date(from+"T00:00:00");
+  const end=new Date(to+"T00:00:00");
+  while(d<=end){
+    out.push(formatLocalDate(d));
+    d.setDate(d.getDate()+1);
+  }
+  return out;
+}
+function datesInMonth(ym){
+  const [y,m]=ym.split("-").map(Number);
+  const daysInMonth=new Date(y,m,0).getDate();
+  const out=[];
+  for(let day=1; day<=daysInMonth; day++){
+    out.push(`${y}-${String(m).padStart(2,"0")}-${String(day).padStart(2,"0")}`);
+  }
+  return out;
+}
+function getDataDateExtent(){
+  const dates=[...faceData,...fpData,...ghrData]
+    .map(r=>(r.Date||"").toString().slice(0,10))
+    .filter(d=>d.length===10)
+    .sort();
+  if(!dates.length){
+    const today=new Date().toISOString().slice(0,10);
+    return {min:today, max:today};
+  }
+  return {min:dates[0], max:dates[dates.length-1]};
+}
+
+/* ── Mode tabs ── */
+function switchMode(m){
+  currentMode=m;
+  ["all","face","fingerprint","greathr"].forEach(x=>{
+    document.getElementById("tab-"+x).className="tab"+(x===m?" active-"+m:"");
+  });
+}
+
+/* ── Flags checkbox handling ── */
+function onFlagsChange(){
+  const checked=v=>document.querySelector(`.flag-cb[value="${v}"]`).checked;
+  document.getElementById("flagThreshLateLogin").style.display=checked("late_login")?"":"none";
+  document.getElementById("flagThreshEarlyLogin").style.display=checked("early_login")?"":"none";
+  document.getElementById("flagThreshFullHours").style.display=(checked("overtime")||checked("insufficient_hours"))?"":"none";
+  updateGenerateButtonState();
+}
+
+function updateGenerateButtonState(){
+  const anyFlag=[...document.querySelectorAll(".flag-cb")].some(cb=>cb.checked);
+  const dropdownVal=document.getElementById("reportType").value;
+  document.getElementById("btnGenerate").disabled=!(anyFlag||dropdownVal);
+  const desc=document.getElementById("reportDesc");
+  const descText=document.getElementById("reportDescText");
+  if(anyFlag){
+    const labels=[...document.querySelectorAll(".flag-cb:checked")].map(cb=>FLAG_LABELS[cb.value]);
+    desc.classList.remove("placeholder");
+    descText.textContent=`Combined report of employee-days matching: ${labels.join(", ")}. Each employee-day appears once, with a Reason column listing every matched flag.`;
+    desc.querySelector(".report-desc-icon").textContent="ℹ️";
+  }else if(!dropdownVal){
+    desc.classList.add("placeholder");
+    descText.textContent="Select a report above to see its description.";
+    desc.querySelector(".report-desc-icon").textContent="💡";
+  }
+}
+
+/* ── Report type change (Other Reports dropdown) ── */
+function onReportTypeChange(){
+  const t=document.getElementById("reportType").value;
+  const sel=document.getElementById("reportType");
+  const row=document.getElementById("thresholdRow");
+  const tSeconds=document.getElementById("thresholdSeconds");
+  const tPunches=document.getElementById("thresholdPunches");
+  const tLabel=document.getElementById("thresholdLabel");
+  const tUnit=document.getElementById("thresholdUnit");
+  const desc=document.getElementById("reportDesc");
+  const descText=document.getElementById("reportDescText");
+
+  [tSeconds,tPunches].forEach(el=>el.style.display="none");
+  tUnit.textContent="";
+
+  // Absent Employees is computed across all sources combined and ignores the mode tabs
+  const modeTabsEl=document.getElementById("modeTabsReports");
+  modeTabsEl.classList.toggle("tabs-disabled", t==="absent");
+
+  if(!t){
+    sel.classList.add("unselected");
+    row.style.display="none";
+    updateGenerateButtonState();
+    return;
+  }
+
+  sel.classList.remove("unselected");
+  desc.classList.remove("placeholder");
+  descText.textContent=REPORT_DESC[t]||"";
+  desc.querySelector(".report-desc-icon").textContent="ℹ️";
+
+  if(t==="duplicate_punch"){
+    row.style.display="flex";
+    tSeconds.style.display="";
+    tLabel.textContent="Within";
+    tUnit.textContent="seconds";
+  }else if(t==="multiple_punch"){
+    row.style.display="flex";
+    tPunches.style.display="";
+    tLabel.textContent="More than";
+    tUnit.textContent="punches";
+  }else{
+    row.style.display="none";
+  }
+  updateGenerateButtonState();
+}
+
+/* ── Helpers ── */
+function getSourceData(){
+  if(currentMode==="face")        return faceData.map(r=>({...r,_mode:"face"}));
+  if(currentMode==="fingerprint") return fpData.map(r=>({...r,_mode:"fingerprint"}));
+  if(currentMode==="greathr")     return ghrData.map(r=>({...r,_mode:"greathr"}));
+  return[
+    ...faceData.map(r=>({...r,_mode:"face"})),
+    ...fpData.map(r=>({...r,_mode:"fingerprint"})),
+    ...ghrData.map(r=>({...r,_mode:"greathr"}))
+  ];
+}
+
+function getTeamFor(uid,name){
+  return window.AttData?window.AttData.getTeam(teamLookup, uid, name):"";
+}
+
+// Canonical Employee ID for any record (summary/pattern/flags rows all carry
+// "User ID" or "Employee No" depending on source). Used to group by the
+// same person even when their Name is spelled differently across sources.
+function getRecId(r){
+  const raw = r["User ID"] || r["Employee No"] || r.ID || "";
+  return window.AttData ? window.AttData.normalizeId(raw) : raw.toString().trim();
+}
+
+function applyBaseFilters(rows){
+  const eid   =document.getElementById("fEmpId").value.trim().toLowerCase();
+  const ename =document.getElementById("fEmpName").value.trim().toLowerCase();
+  const dfrom =document.getElementById("fDateFrom").value;
+  const dto   =document.getElementById("fDateTo").value;
+  const teamSel=document.getElementById("teamFilterReports")?.value||"";
+  const monthSel=document.getElementById("monthFilterReports")?.value||"";
+  return rows.filter(r=>{
+    const id  =(r["User ID"]||r["Employee No"]||"").toString().toLowerCase();
+    const name=(r.Name||"").toLowerCase();
+    const date=(r.Date||"").toString().slice(0,10);
+    if(eid   &&!id.includes(eid))     return false;
+    if(ename &&!name.includes(ename)) return false;
+    if(dfrom && date<dfrom)           return false;
+    if(dto   && date>dto)             return false;
+    if(monthSel && date.slice(0,7)!==monthSel) return false;
+    if(teamSel){
+      const uidRaw=r["User ID"]||r["Employee No"]||"";
+      const team=getTeamFor(uidRaw, r.Name);
+      if(team!==teamSel) return false;
+    }
+    return true;
+  });
+}
+
+function timeToMins(t){if(!t)return null;const[h,m]=t.split(":").map(Number);return h*60+m;}
+function formatDate(d){if(!d)return"—";return new Date(d+"T00:00:00").toLocaleDateString("en-IN",{weekday:"short",day:"2-digit",month:"short",year:"numeric"});}
+function formatDateShort(d){if(!d)return"—";return new Date(d+"T00:00:00").toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"numeric"});}
+
+function modePill(m){
+  if(m==="face")        return`<span class="mode-pill mode-face">👤 Face</span>`;
+  if(m==="fingerprint") return`<span class="mode-pill mode-fp">🖐 Fingerprint</span>`;
+  if(m==="greathr")     return`<span class="mode-pill mode-ghr">📱 Great HR</span>`;
+  return`<span class="mode-pill mode-all">${m}</span>`;
+}
+
+function statusBadge(h, dateStr) {
+  return statusBadgeForDate(h, dateStr);
+}
+
+function modeLabel(m){
+  if(m==="face")return"👤 Face";
+  if(m==="fingerprint")return"🖐 Fingerprint";
+  if(m==="greathr")return"📱 Great HR";
+  return"🔀 All Sources";
+}
+function modeLabelShort(m){
+  if(m==="face")return"Face";
+  if(m==="fingerprint")return"Fingerprint";
+  if(m==="greathr")return"Great HR";
+  return m;
+}
+
+/* Convert "09:15 AM" / "09:15" punch time string to total minutes from midnight */
+function punchTimeToMins(t){
+  if(!t||t==="—")return null;
+  const str=t.trim();
+  const [timePart,period]=(str+" ").trim().split(" ");
+  const parts=timePart.split(":");
+  let h=parseInt(parts[0],10);
+  const m=parseInt(parts[1]||"0",10);
+  if(period&&period.toUpperCase()==="PM"&&h!==12)h+=12;
+  if(period&&period.toUpperCase()==="AM"&&h===12)h=0;
+  return h*60+m;
+}
+
+/* Format minutes as HH:MM */
+function minsToTime(mins){
+  if(mins===null||isNaN(mins))return"—";
+  const h24=Math.floor(mins/60)%24;
+  const m=Math.round(mins%60);
+  const period=h24>=12?"PM":"AM";
+  let h12=h24%12; if(h12===0)h12=12;
+  return`${h12}:${String(m).padStart(2,"0")} ${period}`;
+}
+
+/* ── Shared calculation delegates (att-data.js is the single source of truth) ──
+   These wrappers keep the existing call sites/signatures on this page unchanged
+   while ensuring the actual thresholds and rules live in one shared place, so
+   Day View / Employee Lookup / Reports can never disagree with each other. */
+function getExpectedHours(dateStr){
+  return window.AttData ? window.AttData.getExpectedHours(dateStr) : 8;
+}
+function getLoginStatus(timeStr){
+  return window.AttData ? window.AttData.getLoginStatus(timeStr) : null;
+}
+function statusBadgeForDate(hours, dateStr) {
+  const s = window.AttData ? window.AttData.getAttendanceStatus(hours, dateStr) : {cls:"badge-short",label:"Short"};
+  return `<span class="badge ${s.cls}">${s.label}</span>`;
+}
+
+/* First In, Last Out, Hours for a name+date — across ALL sources (Face +
+   Fingerprint + Great HR combined). Delegates to the shared layer so this
+   can never drift out of sync with Day View / Employee Lookup again. */
+function getOfficialTimes(name, date) {
+  const t = window.AttData.getCrossModeTimes(punchData, name, date);
+  return { firstIn: t.firstIn, lastOut: t.lastOut, hours: t.hours };
+}
+
+function getTotalPunches(name, date) {
+  return punchData.filter(p => p.Name === name && (p.Date||"").slice(0,10) === date).length;
+}
+
+/* ── Combined Attendance Flags report ── */
+async function buildCombinedFlagsReport(flags){
+  const lateThresh   = timeToMins(document.getElementById("threshLateLoginTime").value||"09:45");
+  const earlyThresh  = timeToMins(document.getElementById("threshEarlyLoginTime").value||"09:30");
+  const wdFull       = parseFloat(document.getElementById("threshFullWeekday").value)||8;
+  const satFull      = parseFloat(document.getElementById("threshFullSat").value)||4;
+
+  const src=applyBaseFilters(getSourceData());
+  const map={};
+  src.forEach(r=>{
+    const date=(r.Date||"").toString().slice(0,10);
+    if(!date)return;
+    const key=`${getRecId(r)||r.Name}||${date}`;
+    if(!map[key]){
+      const off=getOfficialTimes(r.Name,date);
+      map[key]={
+        Name:r.Name,
+        ID:r["User ID"]||r["Employee No"]||"",
+        Date:date,
+        First_In:off.firstIn,
+        Last_Out:off.lastOut,
+        Hours:off.hours==="—"?0:off.hours,
+        _officialHours:off.hours,
+        modes:new Set(),
+      };
+    }
+    map[key].modes.add(r._mode);
+  });
+
+  const rows=[];
+  Object.values(map).forEach(e=>{
+    const reasons=[];
+    const firstInMins=punchTimeToMins(e.First_In);
+    const lastOutMins=punchTimeToMins(e.Last_Out);
+    const isSat=new Date(e.Date+"T00:00:00").getDay()===6;
+    const fullThresh=isSat?satFull:wdFull;
+
+    if(flags.includes("late_login") && firstInMins!==null && firstInMins>lateThresh) reasons.push("Late Login");
+    if(flags.includes("early_login") && firstInMins!==null && firstInMins<earlyThresh) reasons.push("Early Login");
+    if(flags.includes("overtime") && e.Hours>fullThresh) reasons.push("Overtime");
+    if(flags.includes("insufficient_hours") && e.Hours>0 && e.Hours<fullThresh) reasons.push("Insufficient Hours");
+    if(flags.includes("missing_checkout") && e.First_In!=="—" && e.Last_Out==="—") reasons.push("Missing Checkout");
+
+    if(reasons.length){
+      rows.push({...e, Mode:[...e.modes].map(modeLabelShort).join(", "), Reason:reasons.join(", ")});
+    }
+  });
+
+  if(flags.includes("absent")){
+    const absentResult = await buildAbsentReport();
+    absentResult.rows.forEach(a=>{
+      const key=`${a.Name}||${a.Date}`;
+      if(!map[key]){
+        rows.push({
+          Name:a.Name, ID:a.ID, Date:a.Date,
+          First_In:"—", Last_Out:"—",
+          Hours:0, _officialHours:"—",
+          Mode:"—", Reason:"Absent",
+        });
+      }
+    });
+  }
+  return rows;
+}
+
+/* ── Absent Employees report ──
+   Walks every WORKING day (Sundays excluded) in the selected range and asks
+   the shared getDayAttendance() layer — driven by the Employee Master — which
+   employees had zero punches across Face + Fingerprint + Great HR that day.
+   This is deliberately independent of the mode tabs: absence is about total
+   silence across all sources, not any one source. */
+async function buildAbsentReport(){
+  const master = employeeMaster.length ? employeeMaster : await window.AttData.getEmployeeMaster();
+
+  const dfrom=document.getElementById("fDateFrom").value;
+  const dto=document.getElementById("fDateTo").value;
+  const monthSel=document.getElementById("monthFilterReports").value;
+
+  let dateList;
+  if(monthSel){
+    dateList = datesInMonth(monthSel);
+  } else if(dfrom || dto){
+    const ext = getDataDateExtent();
+    dateList = datesBetween(dfrom || ext.min, dto || ext.max);
+  } else {
+    const ext = getDataDateExtent();
+    dateList = datesBetween(ext.min, ext.max);
+  }
+
+  const workingDates = dateList.filter(d => !(window.AttData && window.AttData.isSunday(d)));
+
+  const eid   = document.getElementById("fEmpId").value.trim().toLowerCase();
+  const ename = document.getElementById("fEmpName").value.trim().toLowerCase();
+  const teamSel = document.getElementById("teamFilterReports")?.value || "";
+
+  const rows=[];
+  for(const d of workingDates){
+    const att = await window.AttData.getDayAttendance(d, punchData, master);
+    att.employees.forEach(e=>{
+      if(e.status!=="absent") return;
+      if(eid && !(e.id||"").toString().toLowerCase().includes(eid)) return;
+      if(ename && !(e.name||"").toLowerCase().includes(ename)) return;
+      if(teamSel && (e.team||"")!==teamSel) return;
+      rows.push({ Name:e.name, ID:e.id, Date:d, Team:e.team||"" });
+    });
+  }
+  return { rows, workingDaysChecked: workingDates.length };
+}
+
+/* ── Report info header ── */
+function renderReportInfoHeader(title){
+  const now=new Date();
+  const ts=now.toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"numeric"})+" at "+now.toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit"});
+  document.getElementById("rihTitle").textContent=title;
+  document.getElementById("rihTs").textContent="Generated on "+ts;
+
+  const dfrom=document.getElementById("fDateFrom").value;
+  const dto  =document.getElementById("fDateTo").value;
+  const eid  =document.getElementById("fEmpId").value.trim();
+  const ename=document.getElementById("fEmpName").value.trim();
+  const teamSel=document.getElementById("teamFilterReports")?.value||"";
+  const monthSel=document.getElementById("monthFilterReports")?.value||"";
+
+  const tags=[];
+  if(dfrom||dto){
+    const from=dfrom?formatDateShort(dfrom):"earliest";
+    const to  =dto  ?formatDateShort(dto)  :"latest";
+    tags.push(`<span class="rih-tag">📅 Date range: <strong>${from} → ${to}</strong></span>`);
+  }else{
+    tags.push(`<span class="rih-tag">📅 Date range: <strong>All dates</strong></span>`);
+  }
+  const sourceLabel = currentReportType==="absent" ? "All Sources (combined)" : modeLabel(currentMode);
+  tags.push(`<span class="rih-tag">📡 Source: <strong>${sourceLabel}</strong></span>`);
+  if(eid)  tags.push(`<span class="rih-tag">🔢 Employee ID: <strong>${eid}</strong></span>`);
+  if(ename)tags.push(`<span class="rih-tag">👤 Name filter: <strong>${ename}</strong></span>`);
+  if(teamSel)tags.push(`<span class="rih-tag">🏷 Team: <strong>${teamSel}</strong></span>`);
+  if(monthSel)tags.push(`<span class="rih-tag">🗓 Month: <strong>${formatMonthLabel(monthSel)}</strong></span>`);
+
+  document.getElementById("rihMeta").innerHTML=tags.join("");
+}
+
+/* ── Summary cards ── */
+function renderSummaryCards(type, rows, extra){
+  const container=document.getElementById("summaryCards");
+  const cards=[];
+
+  if(type==="flags_combined"){
+    const empSet=new Set(rows.map(r=>r.Name));
+    const reasonCounts={};
+    rows.forEach(r=>r.Reason.split(", ").forEach(x=>{reasonCounts[x]=(reasonCounts[x]||0)+1;}));
+    const topReason=Object.entries(reasonCounts).sort((a,b)=>b[1]-a[1])[0];
+    cards.push({label:"Records Found",val:rows.length,sub:"employee-days flagged",c:"var(--accent2)"});
+    cards.push({label:"Employees",val:empSet.size,sub:"unique",c:"#a89fff"});
+    cards.push({label:"Most Common",val:topReason?topReason[0]:"—",sub:topReason?topReason[1]+" occurrences":"",c:"var(--amber)"});
+    cards.push({label:"Flags Matched",val:Object.keys(reasonCounts).length,sub:"distinct reasons found",c:"var(--green)"});
+  }
+  else if(type==="summary"){
+    const totalEmps=rows.length;
+    const totalDays=rows.reduce((s,r)=>s+r.days,0);
+    const avgH=totalDays?( rows.reduce((s,r)=>s+(parseFloat(r.avgH)||0)*r.days,0)/totalDays ).toFixed(1):"—";
+    const totalPunches=rows.reduce((s,r)=>s+r.punches,0);
+    cards.push({label:"Employees",val:totalEmps,sub:"unique",c:"var(--accent)"});
+    cards.push({label:"Total Day-Records",val:totalDays,sub:"across all sources",c:"#a89fff"});
+    cards.push({label:"Avg Hours / Day",val:avgH+"h",sub:"all employees",c:"var(--amber)"});
+    cards.push({label:"Total Punches",val:totalPunches,sub:"all sources",c:"var(--green)"});
+  }
+  else if(type==="absent"){
+    const empSet=new Set(rows.map(r=>r.Name));
+    const teamSet=new Set(rows.map(r=>r.Team).filter(Boolean));
+    const uniqueDates=new Set(rows.map(r=>r.Date));
+    const workingDaysChecked = extra && extra.workingDaysChecked ? extra.workingDaysChecked : uniqueDates.size;
+    cards.push({label:"Absences Found",val:rows.length,sub:"employee-days",c:"var(--accent2)"});
+    cards.push({label:"Employees Affected",val:empSet.size,sub:"unique",c:"#a89fff"});
+    cards.push({label:"Working Days Checked",val:workingDaysChecked,sub:"Sundays excluded",c:"var(--amber)"});
+    cards.push({label:"Teams Affected",val:teamSet.size,sub:"distinct teams",c:"var(--green)"});
+  }
+  else if(type==="single_punch"){
+    const empSet=new Set(rows.map(r=>r.Name));
+    const faceCount=rows.filter(r=>r._mode==="face").length;
+    const fpCount  =rows.filter(r=>r._mode==="fingerprint").length;
+    const ghrCount =rows.filter(r=>r._mode==="greathr").length;
+    cards.push({label:"Records Found",val:rows.length,sub:"days flagged",c:"var(--accent2)"});
+    cards.push({label:"Employees",val:empSet.size,sub:"unique",c:"#a89fff"});
+    cards.push({label:"Face",val:faceCount,sub:"records",c:"var(--accent)"});
+    cards.push({label:"Fingerprint + GHR",val:fpCount+ghrCount,sub:"records",c:"var(--green)"});
+  }
+  else if(type==="fp_without_face"){
+    const empSet=new Set(rows.map(r=>r.Name));
+    const totalDays=rows.length;
+    const fpOnly=rows.filter(r=>r._fpCount>0&&r._faceCount===0).length;
+    cards.push({label:"Records Found",val:totalDays,sub:"employee-days",c:"var(--accent2)"});
+    cards.push({label:"Employees",val:empSet.size,sub:"unique",c:"#a89fff"});
+    cards.push({label:"FP Only Days",val:fpOnly,sub:"no face punch",c:"var(--amber)"});
+    cards.push({label:"Missing Face",val:empSet.size,sub:"employees affected",c:"var(--accent)"});
+  }
+  else if(type==="face_without_fp"){
+    const empSet=new Set(rows.map(r=>r.Name));
+    cards.push({label:"Records Found",val:rows.length,sub:"employee-days",c:"var(--accent2)"});
+    cards.push({label:"Employees",val:empSet.size,sub:"unique",c:"#a89fff"});
+    cards.push({label:"Missing FP",val:empSet.size,sub:"employees affected",c:"var(--amber)"});
+    cards.push({label:"Face Only Days",val:rows.length,sub:"no fingerprint punch",c:"var(--accent)"});
+  }
+  else if(type==="duplicate_punch"){
+    const empSet=new Set(rows.map(r=>r.Name));
+    const thresh=document.getElementById("thresholdSeconds").value||"30";
+    cards.push({label:"Duplicate Pairs",val:rows.length,sub:"detected",c:"var(--accent2)"});
+    cards.push({label:"Employees",val:empSet.size,sub:"affected",c:"#a89fff"});
+    cards.push({label:"Threshold",val:thresh+"s",sub:"interval used",c:"var(--amber)"});
+    const minDiff=rows.length?Math.min(...rows.map(r=>r._diffSecs)):"—";
+    cards.push({label:"Closest Pair",val:minDiff!=="—"?minDiff+"s":"—",sub:"seconds apart",c:"var(--accent)"});
+  }
+  else if(type==="multiple_punch"){
+    const empSet=new Set(rows.map(r=>r.Name));
+    const thresh=document.getElementById("thresholdPunches").value||"8";
+    const maxP=rows.length?Math.max(...rows.map(r=>r.Total_Punches||0)):"—";
+    cards.push({label:"Records Found",val:rows.length,sub:"days flagged",c:"var(--accent2)"});
+    cards.push({label:"Employees",val:empSet.size,sub:"unique",c:"#a89fff"});
+    cards.push({label:"Threshold",val:">"+thresh,sub:"punches per day",c:"var(--amber)"});
+    cards.push({label:"Max Punches",val:maxP,sub:"single day",c:"var(--green)"});
+  }
+  else if(type==="attendance_pattern"){
+    const empSet=new Set(rows.map(r=>r.Name));
+    const avgDays=(rows.reduce((s,r)=>s+r.days,0)/rows.length||0).toFixed(1);
+    const avgH=(rows.reduce((s,r)=>s+(parseFloat(r.avgHours)||0),0)/rows.length||0).toFixed(1);
+    cards.push({label:"Employees",val:empSet.size,sub:"analysed",c:"var(--accent)"});
+    cards.push({label:"Avg Working Days",val:avgDays,sub:"per employee",c:"#a89fff"});
+    cards.push({label:"Avg Hours / Day",val:avgH+"h",sub:"all employees",c:"var(--amber)"});
+    const avgLogin=rows.filter(r=>r.avgLoginMins!==null);
+    const meanLogin=avgLogin.length?minsToTime(avgLogin.reduce((s,r)=>s+r.avgLoginMins,0)/avgLogin.length):"—";
+    cards.push({label:"Avg Login Time",val:meanLogin,sub:"across employees",c:"var(--green)"});
+  }
+  else if(type==="source_comparison"){
+    const empSet=new Set(rows.map(r=>r.Name));
+    const totalFace=rows.reduce((s,r)=>s+r.faceDays,0);
+    const totalFP  =rows.reduce((s,r)=>s+r.fpDays,0);
+    const totalGHR =rows.reduce((s,r)=>s+r.ghrDays,0);
+    cards.push({label:"Employees",val:empSet.size,sub:"compared",c:"var(--accent)"});
+    cards.push({label:"Face Days",val:totalFace,sub:"total",c:"#a89fff"});
+    cards.push({label:"Fingerprint Days",val:totalFP,sub:"total",c:"var(--green)"});
+    cards.push({label:"Great HR Days",val:totalGHR,sub:"total",c:"var(--amber)"});
+  }
+
+  container.innerHTML=cards.map(c=>`
+    <div class="s-card" style="--c:${c.c}">
+      <div class="sc-label">${c.label}</div>
+      <div class="sc-val">${c.val}</div>
+      <div class="sc-sub">${c.sub}</div>
+    </div>`).join("");
+}
+function renderReasonPills(reasonText){
+    return reasonText.split(", ").map(reason => {
+
+        let cls = "";
+
+        if(reason === "Late Login")
+            cls = "reason-late";
+        else if(reason === "Early Login")
+            cls = "reason-early";
+        else if(reason === "Overtime")
+            cls = "reason-overtime";
+        else if(reason === "Insufficient Hours")
+            cls = "reason-insufficient";
+        else if(reason === "Missing Checkout")
+            cls = "reason-missing";
+
+        return `<span class="reason-pill ${cls}">${reason}</span>`;
+    }).join(" ");
+}
+
+/* ── Generate ── */
+async function generateReport(){
+  const selectedFlags=[...document.querySelectorAll(".flag-cb:checked")].map(cb=>cb.value);
+
+  if(selectedFlags.length){
+    currentReportType="flags_combined";
+    sortState = {...DEFAULT_SORT[currentReportType]};
+    const rows=await buildCombinedFlagsReport(selectedFlags);
+    const headHtml=`<tr>${sortableTh('employee','Employee')}<th>ID</th>${sortableTh('date','Date')}<th>First In</th><th>Last Out</th>${sortableTh('hours','Hours')}<th>Source</th><th>Reason</th></tr>`;
+    const title="Attendance Flags: "+selectedFlags.map(f=>FLAG_LABELS[f]).join(", ");
+
+    reportRows=[...rows];
+    document.getElementById("resHead").innerHTML=headHtml;
+    document.getElementById("resultsTitle").textContent=title;
+    document.getElementById("resultsSection").style.display="";
+    document.getElementById("idleHint").style.display="none";
+    document.getElementById("btnExport").style.display="";
+    document.getElementById("resSearch").value="";
+
+    renderReportInfoHeader(title);
+    renderSummaryCards("flags_combined", rows);
+    filterResults();
+    return;
+  }
+
+  const type=document.getElementById("reportType").value;
+  if(!type)return;
+  currentReportType=type;
+  sortState = {...DEFAULT_SORT[type]};
+
+  let rows=[];
+  let headHtml="";
+  let title="";
+  let extra=null;
+
+  if(type==="absent"){
+    title="Absent Employees";
+    const btn=document.getElementById("btnGenerate");
+    const oldLabel=btn.textContent;
+    btn.textContent="⏳ Checking attendance…";
+    btn.disabled=true;
+    const result = await buildAbsentReport();
+    rows = result.rows;
+    extra = { workingDaysChecked: result.workingDaysChecked };
+    btn.textContent=oldLabel;
+    btn.disabled=false;
+    headHtml=`<tr>${sortableTh('employee','Employee')}<th>ID</th>${sortableTh('date','Date')}<th>Team</th><th>Status</th></tr>`;
+  }
+  else {
+    let src=applyBaseFilters(getSourceData()).map(r=>{
+      const date=(r.Date||"").toString().slice(0,10);
+      const off=getOfficialTimes(r.Name, date);
+      return {
+        ...r,
+        First_In:  off.firstIn,
+        Last_Out:  off.lastOut,
+        Hours:     off.hours==="—" ? 0 : off.hours,
+        _officialHours: off.hours,
+        _totalPunches:  getTotalPunches(r.Name, date),
+      };
+    });
+
+    if(type==="summary"){
+      title="Attendance Summary";
+      const map={};
+      src.forEach(r=>{
+        const k=getRecId(r)||r.Name||"—";
+        if(!map[k])map[k]={Name:r.Name,ID:r["User ID"]||r["Employee No"]||"",face:0,fp:0,ghr:0,totalH:0,punches:0,days:new Set()};
+        const m=r._mode;
+        if(m==="face")map[k].face++;
+        else if(m==="fingerprint")map[k].fp++;
+        else if(m==="greathr")map[k].ghr++;
+        map[k].totalH+=r.Hours||0;
+        map[k].punches+=r.Total_Punches||0;
+        map[k].days.add(r.Date);
+      });
+      rows=Object.values(map).map(e=>({...e,days:e.days.size,avgH:e.days.size?(e.totalH/e.days.size).toFixed(1):"—"}));
+      headHtml=`<tr>${sortableTh('employee','Employee')}<th>ID</th><th>Days</th><th>Face</th><th>Fingerprint</th><th>Great HR</th>${sortableTh('hours','Avg Hours')}${sortableTh('punches','Total Punches')}</tr>`;
+    }
+    else if(type==="single_punch"){
+      title="Single Punch";
+      rows=src.filter(r=>(r.Total_Punches||0)===1);
+      headHtml=`<tr>${sortableTh('employee','Employee')}<th>ID</th>${sortableTh('date','Date')}<th>Punch Time</th><th>Mode</th></tr>`;
+    }
+    else if(type==="fp_without_face"){
+      title="Fingerprint Without Face";
+      const allFace=applyBaseFilters(faceData.map(r=>({...r,_mode:"face"})));
+      const allFP  =applyBaseFilters(fpData.map(r=>({...r,_mode:"fingerprint"})));
+      const faceKeys=new Set(allFace.map(r=>`${getRecId(r)||r.Name}||${r.Date}`));
+      const seen=new Set();
+      rows=[];
+      allFP.forEach(r=>{
+        const key=`${getRecId(r)||r.Name}||${r.Date}`;
+        if(!faceKeys.has(key)&&!seen.has(key)){
+          seen.add(key);
+          rows.push({...r,_faceCount:0,_fpCount:r.Total_Punches||1});
+        }
+      });
+      headHtml=`<tr>${sortableTh('employee','Employee')}<th>ID</th>${sortableTh('date','Date')}<th>FP First In</th><th>FP Last Out</th>${sortableTh('hours','Hours')}${sortableTh('punches','FP Punches')}</tr>`;
+    }
+    else if(type==="face_without_fp"){
+      title="Face Without Fingerprint";
+      const allFace=applyBaseFilters(faceData.map(r=>({...r,_mode:"face"})));
+      const allFP  =applyBaseFilters(fpData.map(r=>({...r,_mode:"fingerprint"})));
+      const fpKeys=new Set(allFP.map(r=>`${getRecId(r)||r.Name}||${r.Date}`));
+      const seen=new Set();
+      rows=[];
+      allFace.forEach(r=>{
+        const key=`${getRecId(r)||r.Name}||${r.Date}`;
+        if(!fpKeys.has(key)&&!seen.has(key)){
+          seen.add(key);
+          rows.push({...r,_faceCount:r.Total_Punches||1,_fpCount:0});
+        }
+      });
+      headHtml=`<tr>${sortableTh('employee','Employee')}<th>ID</th>${sortableTh('date','Date')}<th>Face First In</th><th>Face Last Out</th>${sortableTh('hours','Hours')}${sortableTh('punches','Face Punches')}</tr>`;
+    }
+    else if(type==="duplicate_punch"){
+      title="Duplicate Punch";
+      const threshSecs=parseInt(document.getElementById("thresholdSeconds").value)||30;
+      rows=[];
+      src.forEach(r=>{
+        const fi=r.First_In||"";
+        const lo=r.Last_Out||"";
+        if(!fi||!lo||fi==="—"||lo==="—")return;
+        const m1=punchTimeToMins(fi);
+        const m2=punchTimeToMins(lo);
+        if(m1===null||m2===null)return;
+        const diffSecs=Math.abs(m2-m1)*60;
+        if(diffSecs<=threshSecs){
+          rows.push({...r,_punch1:fi,_punch2:lo,_diffSecs:diffSecs});
+        }
+      });
+      headHtml=`<tr>${sortableTh('employee','Employee')}<th>ID</th>${sortableTh('date','Date')}<th>Punch 1</th><th>Punch 2</th><th>Diff (secs)</th><th>Source</th></tr>`;
+    }
+    else if(type==="multiple_punch"){
+      title="Multiple Punch";
+      const threshPunches=parseInt(document.getElementById("thresholdPunches").value)||8;
+      rows=src.filter(r=>(r.Total_Punches||0)>threshPunches);
+      headHtml=`<tr>${sortableTh('employee','Employee')}<th>ID</th>${sortableTh('date','Date')}${sortableTh('punches','Total Punches')}${sortableTh('hours','Hours')}<th>Source</th></tr>`;
+    }
+    else if(type==="attendance_pattern"){
+      title="Attendance Pattern";
+      const map={};
+      src.forEach(r=>{
+        const k=getRecId(r)||r.Name||"—";
+        if(!map[k])map[k]={Name:r.Name,ID:r["User ID"]||r["Employee No"]||"",loginMins:[],logoutMins:[],totalH:0,totalPunches:0,days:new Set()};
+        map[k].days.add(r.Date);
+        map[k].totalH+=r.Hours||0;
+        map[k].totalPunches+=r.Total_Punches||0;
+        const lm=punchTimeToMins(r.First_In);
+        if(lm!==null)map[k].loginMins.push(lm);
+        const om=punchTimeToMins(r.Last_Out);
+        if(om!==null)map[k].logoutMins.push(om);
+      });
+      rows=Object.values(map).map(e=>{
+        const days=e.days.size;
+        const avgLoginMins=e.loginMins.length?e.loginMins.reduce((a,b)=>a+b,0)/e.loginMins.length:null;
+        const avgLogoutMins=e.logoutMins.length?e.logoutMins.reduce((a,b)=>a+b,0)/e.logoutMins.length:null;
+        return{
+          Name:e.Name,ID:e.ID,days,
+          avgLoginMins,
+          avgLogoutMins,
+          avgLoginStr:minsToTime(avgLoginMins),
+          avgLogoutStr:minsToTime(avgLogoutMins),
+          avgHours:days?(e.totalH/days).toFixed(1):"—",
+          avgPunches:days?(e.totalPunches/days).toFixed(1):"—",
+        };
+      });
+      headHtml=`<tr>${sortableTh('employee','Employee')}<th>ID</th><th>Working Days</th><th>Avg Login</th><th>Avg Logout</th>${sortableTh('hours','Avg Hours')}${sortableTh('punches','Avg Punches/Day')}</tr>`;
+    }
+    else if(type==="source_comparison"){
+      title="Attendance Source Comparison";
+      const allFace=applyBaseFilters(faceData.map(r=>({...r,_mode:"face"})));
+      const allFP  =applyBaseFilters(fpData.map(r=>({...r,_mode:"fingerprint"})));
+      const allGHR =applyBaseFilters(ghrData.map(r=>({...r,_mode:"greathr"})));
+      const map={};
+      const ensureEmp=(r)=>{
+        const k=getRecId(r)||r.Name||"—";
+        if(!map[k])map[k]={Name:r.Name,ID:r["User ID"]||r["Employee No"]||"",faceDays:0,fpDays:0,ghrDays:0,allDays:new Set()};
+        return map[k];
+      };
+      allFace.forEach(r=>{const e=ensureEmp(r);e.faceDays++;e.allDays.add(r.Date);});
+      allFP.forEach(r=>  {const e=ensureEmp(r);e.fpDays++;  e.allDays.add(r.Date);});
+      allGHR.forEach(r=> {const e=ensureEmp(r);e.ghrDays++; e.allDays.add(r.Date);});
+      rows=Object.values(map).map(e=>({...e,totalDays:e.allDays.size}));
+      headHtml=`<tr>${sortableTh('employee','Employee')}<th>ID</th><th>Face Days</th><th>Fingerprint Days</th><th>Great HR Days</th><th>Total Working Days</th></tr>`;
+    }
+  }
+
+  reportRows=[...rows];
+  document.getElementById("resHead").innerHTML=headHtml;
+  document.getElementById("resultsTitle").textContent=title;
+  document.getElementById("resultsSection").style.display="";
+  document.getElementById("idleHint").style.display="none";
+  document.getElementById("btnExport").style.display="";
+  document.getElementById("resSearch").value="";
+
+  renderReportInfoHeader(title);
+  renderSummaryCards(type, rows, extra);
+  filterResults();
+}
+
+/* ── Filter / sort results table (filtering always happens before sorting) ── */
+function rankValueForType(type, r){
+  if(type==="flags_combined") return r.Hours||0;
+  if(type==="fp_without_face") return r._fpCount||0;
+  if(type==="face_without_fp") return r._faceCount||0;
+  if(type==="multiple_punch") return r.Total_Punches||0;
+  if(type==="duplicate_punch") return -(r._diffSecs||0); // closest pairs rank highest
+  if(type==="attendance_pattern") return parseFloat(r.avgHours)||0;
+  if(type==="summary") return parseFloat(r.avgH)||0;
+  return r.Hours||r.totalH||0;
+}
+
+function filterResults(){
+  const type=currentReportType;
+  const q=document.getElementById("resSearch").value.toLowerCase().trim();
+  const topN=parseInt(document.getElementById("rankTop").value)||0;
+
+  // Filtering always happens before sorting
+  let rows=[...reportRows].filter(r=>{
+    if(!q)return true;
+    const name=(r.Name||"").toLowerCase();
+    const id=(r.ID||"").toString().toLowerCase();
+    return name.includes(q)||id.includes(q);
+  });
+
+  rows.sort(compareRows);
+  updateSortIndicators();
+
+  if(topN>0){
+    rows=[...rows].sort((a,b)=>rankValueForType(type,b)-rankValueForType(type,a)).slice(0,topN);
+  }
+
+  filteredRows=rows;
+  document.getElementById("resCount").textContent=`${rows.length} record${rows.length!==1?"s":""}`;
+  document.getElementById("resFoot").textContent=`${rows.length} record${rows.length!==1?"s":""} shown`;
+
+  const tbody=document.getElementById("resTbody");
+  if(!rows.length){
+    const q_val=document.getElementById("resSearch").value.trim();
+    const hasDateFilter=document.getElementById("fDateFrom").value||document.getElementById("fDateTo").value;
+    const hasEmpFilter=document.getElementById("fEmpId").value.trim()||document.getElementById("fEmpName").value.trim();
+    const hasTeamFilter=document.getElementById("teamFilterReports")?.value;
+    const hasMonthFilter=document.getElementById("monthFilterReports")?.value;
+    const tips=[];
+    if(q_val) tips.push("Clear the results filter field above the table");
+    if(hasDateFilter) tips.push("Widen the date range or remove date filters");
+    if(hasEmpFilter) tips.push("Remove the Employee ID or Name filter");
+    if(hasTeamFilter) tips.push("Remove the Team filter");
+    if(hasMonthFilter) tips.push("Remove the Month filter");
+    if(!q_val&&!hasDateFilter&&!hasEmpFilter&&!hasTeamFilter&&!hasMonthFilter) tips.push("Try a different report type or flag combination");
+    tips.push("Switch the attendance source tab (All / Face / Fingerprint / Great HR)");
+    tbody.innerHTML=`<tr><td colspan="10">
+      <div class="empty-state">
+        <div class="es-icon">🔍</div>
+        <div class="es-title">No employees matched the selected criteria</div>
+        <div class="es-sub">The current filters returned no records for this report.</div>
+        <div class="es-tips">
+          ${tips.map(t=>`<div class="es-tip">${t}</div>`).join("")}
+        </div>
+      </div>
+    </td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML=rows.map((r,i)=>buildRow(type,r,i)).join("");
+}
+
+function buildRow(type,r,i){
+  const id=r.ID||r["User ID"]||r["Employee No"]||"—";
+  const date=(r.Date||"").toString().slice(0,10);
+  const safeName=(r.Name||"").replace(/'/g,"\\'");
+  const safeId=id.replace(/'/g,"\\'");
+  // Rows with a date get a panel opener; aggregate rows (summary, pattern, top, comparison) do not.
+  // Absent rows also skip the panel — there are no punches to inspect.
+  const hasDate=!!date && type!=="absent";
+  const rowClick=hasDate?`onclick="openPanel('${safeName}','${date}','${safeId}')" style="cursor:pointer"`:"";
+
+  if(type==="flags_combined"){
+    const ls=getLoginStatus(r.First_In);
+    const firstInHtml=ls?`<span style="color:${ls.color};font-weight:600;cursor:default" title="${ls.tooltip}">${window.AttData.formatTime12h(r.First_In)}</span>`:(r.First_In?window.AttData.formatTime12h(r.First_In):"—");
+    return`<tr ${rowClick}>
+      <td><span class="emp-name">${r.Name}</span></td>
+      <td style="color:var(--muted)">${id}</td>
+      <td style="color:var(--muted)">${formatDate(r.Date)}</td>
+      <td>${firstInHtml}</td>
+      <td class="t-out">${window.AttData.formatTime12h(r.Last_Out)||"—"}</td>
+      <td style="font-weight:600">${r._officialHours==="—"?"—":r._officialHours+"h"}</td>
+      <td style="color:var(--muted);font-size:12px">${r.Mode}</td>
+      <td>${renderReasonPills(r.Reason)}</td>
+    </tr>`;
+  }
+  if(type==="summary"){
+    return`<tr>
+      <td><span class="emp-name">${r.Name}</span></td>
+      <td style="color:var(--muted)">${id}</td>
+      <td style="font-weight:600">${r.days}</td>
+      <td><span class="mode-pill mode-face">${r.face}</span></td>
+      <td><span class="mode-pill mode-fp">${r.fp}</span></td>
+      <td><span class="mode-pill mode-ghr">${r.ghr}</span></td>
+      <td style="font-weight:600;color:var(--amber)">${r.avgH==="—"?r.avgH:r.avgH+"h"}</td>
+      <td style="color:var(--muted)">${r.punches}</td>
+    </tr>`;
+  }
+  if(type==="absent"){
+    const teamHtml=r.Team?`<span class="mode-pill mode-all">${r.Team}</span>`:'<span style="color:var(--muted)">—</span>';
+    return`<tr>
+      <td><span class="emp-name">${r.Name}</span></td>
+      <td style="color:var(--muted)">${id}</td>
+      <td style="color:var(--muted)">${formatDate(r.Date)}</td>
+      <td>${teamHtml}</td>
+      <td><span class="badge badge-short">Absent</span></td>
+    </tr>`;
+  }
+  if(type==="single_punch"){
+    return`<tr ${rowClick}>
+      <td><span class="emp-name">${r.Name}</span></td>
+      <td style="color:var(--muted)">${id}</td>
+      <td style="color:var(--muted)">${formatDate(r.Date)}</td>
+      <td class="t-in">${window.AttData.formatTime12h(r.First_In)||"—"}</td>
+      <td>${modePill(r._mode)}</td>
+    </tr>`;
+  }
+  if(type==="fp_without_face"||type==="face_without_fp"){
+    const off=getOfficialTimes(r.Name,(r.Date||"").toString().slice(0,10));
+    const countLabel = type==="fp_without_face" ? (r._fpCount||"—") : (r._faceCount||"—");
+    return`<tr ${rowClick}>
+      <td><span class="emp-name">${r.Name}</span></td>
+      <td style="color:var(--muted)">${id}</td>
+      <td style="color:var(--muted)">${formatDate(r.Date)}</td>
+      <td class="t-in">${window.AttData.formatTime12h(r.First_In)||"—"}</td>
+      <td class="t-out">${window.AttData.formatTime12h(r.Last_Out)||"—"}</td>
+      <td style="font-weight:600">${off.hours==="—"?"—":off.hours+"h"}</td>
+      <td style="color:var(--muted)">${countLabel}</td>
+    </tr>`;
+  }
+  if(type==="duplicate_punch"){
+    return`<tr ${rowClick}>
+      <td><span class="emp-name">${r.Name}</span></td>
+      <td style="color:var(--muted)">${id}</td>
+      <td style="color:var(--muted)">${formatDate(r.Date)}</td>
+      <td class="t-in">${window.AttData.formatTime12h(r._punch1)||"—"}</td>
+      <td class="t-in">${window.AttData.formatTime12h(r._punch2)||"—"}</td>
+      <td style="font-weight:600;color:var(--accent2)">${r._diffSecs}s</td>
+      <td>${modePill(r._mode)}</td>
+    </tr>`;
+  }
+  if(type==="multiple_punch"){
+    return`<tr ${rowClick}>
+      <td><span class="emp-name">${r.Name}</span></td>
+      <td style="color:var(--muted)">${id}</td>
+      <td style="color:var(--muted)">${formatDate(r.Date)}</td>
+      <td style="font-weight:600;color:var(--accent2)">${r.Total_Punches||"—"}</td>
+      <td style="font-weight:600">${r._officialHours==="—"?"—":r._officialHours+"h"}</td>
+      <td>${modePill(r._mode)}</td>
+    </tr>`;
+  }
+  if(type==="attendance_pattern"){
+    return`<tr>
+      <td><span class="emp-name">${r.Name}</span></td>
+      <td style="color:var(--muted)">${id}</td>
+      <td style="font-weight:600">${r.days}</td>
+      <td class="t-in">${r.avgLoginStr||"—"}</td>
+      <td class="t-out">${r.avgLogoutStr||"—"}</td>
+      <td style="font-weight:600;color:var(--amber)">${r.avgHours}h</td>
+      <td style="color:var(--muted)">${r.avgPunches}</td>
+    </tr>`;
+  }
+  if(type==="source_comparison"){
+    const total=r.totalDays||0;
+    const fPct=total?Math.round(r.faceDays/total*100):0;
+    const fpPct=total?Math.round(r.fpDays/total*100):0;
+    const gPct=total?Math.round(r.ghrDays/total*100):0;
+    return`<tr>
+      <td><span class="emp-name">${r.Name}</span></td>
+      <td style="color:var(--muted)">${id}</td>
+      <td><span class="mode-pill mode-face">${r.faceDays} <span style="opacity:.6;font-weight:400">(${fPct}%)</span></span></td>
+      <td><span class="mode-pill mode-fp">${r.fpDays} <span style="opacity:.6;font-weight:400">(${fpPct}%)</span></span></td>
+      <td><span class="mode-pill mode-ghr">${r.ghrDays} <span style="opacity:.6;font-weight:400">(${gPct}%)</span></span></td>
+      <td style="font-weight:700">${r.totalDays}</td>
+    </tr>`;
+  }
+  return`<tr><td colspan="8">${JSON.stringify(r)}</td></tr>`;
+}
+
+/* ── Build data rows for export ── */
+function buildExportRows(){
+  const type=currentReportType;
+  const headers=[...document.querySelectorAll("#resHead th")].map(h=>h.textContent);
+  const dataRows=filteredRows.map(r=>{
+    const id=r.ID||r["User ID"]||r["Employee No"]||"";
+    if(type==="flags_combined")        return[r.Name,id,r.Date,r.First_In,r.Last_Out,r._officialHours==="—"?"":r._officialHours,r.Mode,r.Reason];
+    if(type==="summary")               return[r.Name,id,r.days,r.face,r.fp,r.ghr,r.avgH,r.punches];
+    if(type==="absent")                return[r.Name,id,r.Date,r.Team||"","Absent"];
+    if(type==="single_punch")          return[r.Name,id,r.Date,r.First_In,r._mode];
+    if(type==="fp_without_face")       return[r.Name,id,r.Date,r.First_In,r.Last_Out,r.Hours,r._fpCount];
+    if(type==="face_without_fp")       return[r.Name,id,r.Date,r.First_In,r.Last_Out,r.Hours,r._faceCount];
+    if(type==="duplicate_punch")       return[r.Name,id,r.Date,r._punch1,r._punch2,r._diffSecs,r._mode];
+    if(type==="multiple_punch")        return[r.Name,id,r.Date,r.Total_Punches,r.Hours,r._mode];
+    if(type==="attendance_pattern")    return[r.Name,id,r.days,r.avgLoginStr,r.avgLogoutStr,r.avgHours,r.avgPunches];
+    if(type==="source_comparison")     return[r.Name,id,r.faceDays,r.fpDays,r.ghrDays,r.totalDays];
+    return Object.values(r);
+  });
+  return{headers,dataRows};
+}
+
+/* ── Export Excel ── */
+function exportExcel(){
+  if(!filteredRows.length){alert("No data to export.");return;}
+  const title=document.getElementById("resultsTitle").textContent;
+  const{headers,dataRows}=buildExportRows();
+  const escape=s=>String(s??'').replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  const rows=[headers,...dataRows];
+  const table=`<table>${rows.map((r,i)=>`<tr>${r.map(c=>`<${i===0?"th":"td"}>${escape(c)}</${i===0?"th":"td"}>`).join("")}</tr>`).join("")}</table>`;
+  const html=`<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="UTF-8"><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>${escape(title)}</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--></head><body>${table}</body></html>`;
+  const blob=new Blob([html],{type:"application/vnd.ms-excel;charset=utf-8"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download=`${title.replace(/\s+/g,"_")}.xls`;
+  a.click();
+}
+
+/* ── Print ── */
+function printReport(){window.print();}
+
+function openPanel(name, date, uid) {
+  const t = window.AttData.getCrossModeTimes(punchData, name, date);
+  const firstIn = t.firstIn;
+  const lastOut = t.lastOut;
+  const totalPunches = t.totalPunches;
+
+  document.getElementById("panel-name").textContent = name;
+  document.getElementById("panel-id").textContent   = uid ? "Employee ID: #"+uid : "";
+  document.getElementById("pe-name").textContent    = name;
+  document.getElementById("pe-id").textContent      = uid ? "#"+uid : "No ID on record";
+  document.getElementById("panel-day-label").textContent = "📅 "+formatDateLong(date);
+  document.getElementById("ps-firstin").textContent = window.AttData.formatTime12h(firstIn);
+  document.getElementById("ps-lastout").textContent = window.AttData.formatTime12h(lastOut);
+  document.getElementById("ps-punches").textContent = totalPunches;
+
+  const modes=[];
+  if(faceData.some(r=>r.Name===name&&(r.Date||"").slice(0,10)===date)) modes.push(`<span class="mode-pill mode-face">👤 Face</span>`);
+  if(fpData.some(r=>r.Name===name&&(r.Date||"").slice(0,10)===date))   modes.push(`<span class="mode-pill mode-fp">🖐 Fingerprint</span>`);
+  if(ghrData.some(r=>r.Name===name&&(r.Date||"").slice(0,10)===date))  modes.push(`<span class="mode-pill mode-ghr">📱 Great HR</span>`);
+  document.getElementById("pe-modes").innerHTML = modes.join("");
+
+  const rows = punchData.filter(p=>p.Name===name && (p.Date||"").slice(0,10)===date).slice().sort((a,b)=>a.Time.localeCompare(b.Time));
+  const total = rows.length;
+  document.getElementById("punch-foot").textContent = `${total} punch event${total!==1?"s":""} on this day`;
+  const tbody = document.getElementById("punch-tbody");
+  if (!rows.length) {
+    tbody.innerHTML=`<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted)">No punch events found</td></tr>`;
+  } else {
+    tbody.innerHTML = rows.map((p,j)=>{
+      const isIn=j===0, isOut=j===total-1&&total>1;
+      const label=isIn?"🟢 In":isOut?"🔴 Out":`⚪ #${j+1}`;
+      const tc=isIn?"punch-in":isOut?"punch-out":"";
+      const mp=p.Mode==="face"
+        ?`<span class="mode-pill mode-face">👤 Face</span>`
+        :p.Mode==="fingerprint"
+        ?`<span class="mode-pill mode-fp">🖐 FP</span>`
+        :`<span class="mode-pill mode-ghr">📱 GHR</span>`;
+      return`<tr>
+        <td style="color:var(--muted);font-size:12px;text-align:center">${j+1}</td>
+        <td class="${tc}" style="font-size:16px;font-weight:700;letter-spacing:.03em">${window.AttData.formatTime12h(p.Time)}</td>
+        <td style="font-size:13px">${label}</td>
+        <td>${mp}</td>
+        <td style="font-size:13px;color:var(--muted)">${p.Device||"—"}</td>
+      </tr>`;
+    }).join("");
+  }
+  document.getElementById("overlay").classList.add("open");
+  document.getElementById("panel").classList.add("open");
+}
+
+function closePanel(){
+  document.getElementById("overlay").classList.remove("open");
+  document.getElementById("panel").classList.remove("open");
+}
+
+function formatDateLong(d){
+  if(!d)return"—";
+  return new Date(d+"T00:00:00").toLocaleDateString("en-IN",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
+}
+
+document.addEventListener("keydown",e=>{if(e.key==="Escape")closePanel();});
+
+/* ── Clear ── */
+function clearAll(){
+  ["fEmpId","fEmpName","fDateFrom","fDateTo"].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el)el.value="";
+  });
+  document.getElementById("teamFilterReports").value="";
+  document.getElementById("monthFilterReports").value="";
+  document.querySelectorAll(".flag-cb").forEach(cb=>cb.checked=false);
+  ["flagThreshLateLogin","flagThreshEarlyLogin","flagThreshFullHours"].forEach(id=>{
+    document.getElementById(id).style.display="none";
+  });
+  document.getElementById("threshLateLoginTime").value="09:45";
+  document.getElementById("threshEarlyLoginTime").value="09:30";
+  document.getElementById("threshFullWeekday").value="8";
+  document.getElementById("threshFullSat").value="4";
+  document.getElementById("thresholdSeconds").value="30";
+  document.getElementById("thresholdPunches").value="8";
+  document.getElementById("rankTop").value="";
+  const sel=document.getElementById("reportType");
+  sel.value="";
+  sel.classList.add("unselected");
+  document.getElementById("modeTabsReports").classList.remove("tabs-disabled");
+  const desc=document.getElementById("reportDesc");
+  desc.classList.add("placeholder");
+  document.getElementById("reportDescText").textContent="Select a report above to see its description.";
+  desc.querySelector(".report-desc-icon").textContent="💡";
+  document.getElementById("thresholdRow").style.display="none";
+  document.getElementById("resultsSection").style.display="none";
+  document.getElementById("idleHint").style.display="";
+  document.getElementById("btnExport").style.display="none";
+  document.getElementById("btnGenerate").disabled=true;
+  reportRows=[];filteredRows=[];currentReportType="";
+  sortState={column:'date',direction:'desc'};
+}
+</script>
+<!-- Overlay + Panel (Punch Details) -->
+<div class="overlay" id="overlay" onclick="closePanel()"></div>
+<div class="panel" id="panel">
+  <div class="panel-header">
+    <div>
+      <h2 id="panel-name">—</h2>
+      <div class="ph-sub" id="panel-id">—</div>
+    </div>
+    <button class="btn-close" onclick="closePanel()">×</button>
+  </div>
+  <div class="panel-body">
+    <div class="panel-emp-header">
+      <div class="panel-emp-name" id="pe-name">—</div>
+      <div class="panel-emp-id"   id="pe-id">—</div>
+      <div class="panel-mode-pills" id="pe-modes"></div>
+    </div>
+    <div class="panel-stat-row">
+      <div class="panel-stat">
+        <div class="ps-label">First In</div>
+        <div class="ps-val" id="ps-firstin" style="color:var(--green);font-size:16px">—</div>
+      </div>
+      <div class="panel-stat">
+        <div class="ps-label">Last Out</div>
+        <div class="ps-val" id="ps-lastout" style="color:var(--accent2);font-size:16px">—</div>
+      </div>
+      <div class="panel-stat">
+        <div class="ps-label">Total Punches</div>
+        <div class="ps-val" id="ps-punches" style="color:var(--accent)">—</div>
+      </div>
+    </div>
+    <div class="panel-day-label" id="panel-day-label">📅 —</div>
+    <div id="pv-punches">
+      <div class="panel-section-title">Punch Events for This Day</div>
+      <div class="panel-table-wrap">
+        <table class="panel-table">
+          <thead><tr><th>#</th><th>Time</th><th>Punch</th><th>Mode</th><th>Device</th></tr></thead>
+          <tbody id="punch-tbody"></tbody>
+        </table>
+        <div class="panel-foot" id="punch-foot">—</div>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Import Centre — Attendance</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Firebase v8 compat (CDN — no build step needed) -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+  <!-- Your project credentials — fill in firebase-config.js -->
+  <script src="firebase-config.js"></script>
+  <script>
+    // Initialise Firebase once
+    if (!firebase.apps.length) {
+      firebase.initializeApp(firebaseConfig);
+    }
+    const db = firebase.firestore();
+  </script>
+
+  <style>
+    :root{
+    --bg:#f3f4f8;
+    --surface:#ffffff;
+    --surface2:#f9fafb;
+    --border:#e5e7eb;
+    --accent:#6c63ff;
+    --accent2:#4ecca3;
+    --text:#111827;
+    --muted:#6b7280;
+    --danger:#ff5c6c;
+    --success:#4ecca3;
+    --radius:12px;
+    --input-bg:#f9fafb;
+}
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;}
+    .logo{font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:12px;}
+    h1{font-family:'Space Grotesk',sans-serif;font-size:28px;font-weight:700;color:var(--text);margin-bottom:8px;text-align:center;}
+    .subtitle{color:var(--muted);font-size:14px;text-align:center;margin-bottom:40px;max-width:420px;line-height:1.6;}
+    .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:32px;width:100%;max-width:520px;}
+    .card + .card{margin-top:20px;}
+    .card-title{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;margin-bottom:4px;}
+    .card-hint{font-size:12px;color:var(--muted);margin-bottom:18px;line-height:1.5;}
+    .upload-zone{border:2px dashed var(--border);border-radius:10px;padding:28px 20px;text-align:center;cursor:pointer;transition:border-color .2s,background .2s;position:relative;margin-bottom:16px;}
+    .upload-zone:hover,.upload-zone.dragover{border-color:var(--accent);background:rgba(108,99,255,.06);}
+    .upload-zone.done{border-color:var(--success);background:rgba(78,204,163,.06);}
+    .upload-zone input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
+    .upload-icon{font-size:28px;margin-bottom:10px;display:block;}
+    .upload-label{font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:14px;color:var(--text);margin-bottom:4px;}
+    .upload-hint{font-size:12px;color:var(--muted);}
+    .file-name{font-size:12px;color:var(--success);margin-top:8px;font-weight:500;display:none;}
+    .upload-zone.done .file-name{display:block;}
+    .upload-zone.done .upload-hint{display:none;}
+    .divider{height:1px;background:var(--border);margin:24px 0;}
+    .btn{width:100%;padding:14px;background:var(--accent);color:#fff;border:none;border-radius:10px;font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;cursor:pointer;transition:opacity .2s,transform .1s;display:flex;align-items:center;justify-content:center;gap:10px;}
+    .btn:hover{opacity:.9;}.btn:active{transform:scale(.98);}.btn:disabled{opacity:.4;cursor:not-allowed;transform:none;}
+    .btn-secondary{background:var(--surface2);color:var(--text);border:1px solid var(--border);}
+    .progress-wrap{display:none;margin-top:20px;}
+    .progress-wrap.show{display:block;}
+    .progress-label{font-size:12px;color:var(--muted);margin-bottom:8px;display:flex;justify-content:space-between;}
+    .progress-bar-bg{height:6px;background:var(--surface2);border-radius:99px;overflow:hidden;}
+    .progress-bar{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:99px;width:0%;transition:width .3s ease;}
+    .progress-steps{margin-top:14px;display:flex;flex-direction:column;gap:8px;}
+    .step{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:8px;}
+    .step.active{color:var(--text);}.step.done{color:var(--success);}
+    .step-dot{width:7px;height:7px;border-radius:50%;background:var(--border);flex-shrink:0;}
+    .step.active .step-dot{background:var(--accent);}.step.done .step-dot{background:var(--success);}
+    .cached-banner{display:none;background:rgba(78,204,163,.1);border:1px solid rgba(78,204,163,.3);border-radius:10px;padding:14px 16px;margin-bottom:20px;font-size:13px;color:var(--success);align-items:center;gap:10px;}
+    .cached-banner.show{display:flex;}
+    .cached-banner strong{color:var(--text);}
+    .go-dashboard{margin-top:12px;display:block;text-align:center;font-size:13px;color:var(--accent);text-decoration:none;font-weight:500;}
+    .error-msg{display:none;background:rgba(255,92,108,.1);border:1px solid rgba(255,92,108,.3);border-radius:10px;padding:14px 16px;margin-top:16px;font-size:13px;color:var(--danger);}
+    .error-msg.show{display:block;}
+    .sync-status{display:none;margin-top:14px;padding:10px 14px;border-radius:8px;font-size:13px;text-align:center;}
+    .sync-status.syncing{display:block;background:rgba(108,99,255,.1);border:1px solid rgba(108,99,255,.3);color:var(--accent);}
+    .sync-status.synced{display:block;background:rgba(78,204,163,.1);border:1px solid rgba(78,204,163,.3);color:var(--success);}
+    .sync-status.error{display:block;background:rgba(255,92,108,.1);border:1px solid rgba(255,92,108,.3);color:var(--danger);}
+  </style>
+</head>
+<body>
+  <div class="logo">Attendance System</div>
+  <h1>Import Centre</h1>
+  <p class="subtitle">Upload Biometric and GreatHR files to sync attendance across all users.</p>
+
+  <div class="card">
+    <div class="cached-banner" id="cachedBanner">
+      <span>✓</span>
+      <span><strong>Cloud data is up to date.</strong> Upload new files to sync the latest attendance.</span>
+    </div>
+    <a href="index.html" class="go-dashboard" id="goDash" style="display:none">→ Open Dashboard</a>
+
+    <div class="upload-zone" id="bioZone">
+      <input type="file" id="bioFile" accept=".xlsx,.xls">
+      <span class="upload-icon">🧬</span>
+      <div class="upload-label">Biometric Report</div>
+      <div class="upload-hint">Consolidated sheet · .xlsx</div>
+      <div class="file-name" id="bioFileName"></div>
+    </div>
+
+    <div class="upload-zone" id="ghrZone">
+      <input type="file" id="ghrFile" accept=".xlsx,.xls">
+      <span class="upload-icon">📋</span>
+      <div class="upload-label">GreatHR Report</div>
+      <div class="upload-hint">Sheet0 · .xlsx</div>
+      <div class="file-name" id="ghrFileName"></div>
+    </div>
+
+    <div class="divider"></div>
+
+    <button class="btn" id="processBtn" disabled onclick="processFiles()">
+      <span>Import & Sync</span>
+    </button>
+
+    <div class="progress-wrap" id="progressWrap">
+      <div class="progress-label">
+        <span id="progressLabel">Processing…</span>
+        <span id="progressPct">0%</span>
+      </div>
+      <div class="progress-bar-bg"><div class="progress-bar" id="progressBar"></div></div>
+      <div class="progress-steps">
+        <div class="step" id="step1"><div class="step-dot"></div>Reading Biometric file</div>
+        <div class="step" id="step2"><div class="step-dot"></div>Splitting Face vs Fingerprint</div>
+        <div class="step" id="step3"><div class="step-dot"></div>Reading GreatHR file</div>
+        <div class="step" id="step4"><div class="step-dot"></div>Building daily summaries</div>
+        <div class="step" id="step5"><div class="step-dot"></div>Building punch details</div>
+        <div class="step" id="step6"><div class="step-dot"></div>Merging with existing data</div>
+        <div class="step" id="step7"><div class="step-dot"></div>Removing records older than 6 months</div>
+        <div class="step" id="step8"><div class="step-dot"></div>Syncing to cloud</div>
+      </div>
+    </div>
+
+    <div class="sync-status" id="syncStatus"></div>
+    <div class="error-msg" id="errorMsg"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Employee Master</div>
+    <div class="card-hint">Upload only when employee information changes.</div>
+
+    <div class="upload-zone" id="empZone">
+      <input type="file" id="empFile" accept=".xlsx,.xls">
+      <span class="upload-icon">🗂️</span>
+      <div class="upload-label">Employee Master</div>
+      <div class="upload-hint">Employee ID · Employee Name · Team · .xlsx</div>
+      <div class="file-name" id="empFileName"></div>
+    </div>
+
+    <button class="btn btn-secondary" id="empBtn" disabled onclick="processEmployeeMaster()">
+      <span>Update Employee Master</span>
+    </button>
+
+    <div class="progress-wrap" id="empProgressWrap">
+      <div class="progress-label">
+        <span id="empProgressLabel">Processing…</span>
+        <span id="empProgressPct">0%</span>
+      </div>
+      <div class="progress-bar-bg"><div class="progress-bar" id="empProgressBar"></div></div>
+    </div>
+
+    <div class="sync-status" id="empSyncStatus"></div>
+    <div class="error-msg" id="empErrorMsg"></div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script>
+  // ── UI setup ──────────────────────────────────────────────────────────────
+  const bioInput   = document.getElementById('bioFile');
+  const ghrInput   = document.getElementById('ghrFile');
+  const processBtn = document.getElementById('processBtn');
+  const empInput   = document.getElementById('empFile');
+  const empBtn     = document.getElementById('empBtn');
+
+  // Check if cloud data exists
+  db.collection('attendance').doc('att_face_summary').get().then(doc => {
+    if (doc.exists) {
+      document.getElementById('cachedBanner').classList.add('show');
+      document.getElementById('goDash').style.display = 'block';
+    }
+  }).catch(() => {
+    // Offline or config not set — check localStorage fallback
+    if (localStorage.getItem('att_face_summary')) {
+      document.getElementById('cachedBanner').classList.add('show');
+      document.getElementById('goDash').style.display = 'block';
+    }
+  });
+
+  function setupZone(input, zone, nameEl, onReady) {
+    input.addEventListener('change', () => {
+      if (input.files[0]) { zone.classList.add('done'); nameEl.textContent = '✓ ' + input.files[0].name; onReady(); }
+    });
+    zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
+    zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+    zone.addEventListener('drop', e => {
+      e.preventDefault(); zone.classList.remove('dragover');
+      const file = e.dataTransfer.files[0];
+      if (file) {
+        const dt = new DataTransfer(); dt.items.add(file); input.files = dt.files;
+        zone.classList.add('done'); nameEl.textContent = '✓ ' + file.name; onReady();
+      }
+    });
+  }
+  setupZone(bioInput, document.getElementById('bioZone'), document.getElementById('bioFileName'), checkReady);
+  setupZone(ghrInput, document.getElementById('ghrZone'), document.getElementById('ghrFileName'), checkReady);
+  setupZone(empInput, document.getElementById('empZone'), document.getElementById('empFileName'), () => { empBtn.disabled = !empInput.files[0]; });
+  function checkReady() { processBtn.disabled = !(bioInput.files[0] && ghrInput.files[0]); }
+
+  function setStep(n, state) { document.getElementById('step'+n).className = 'step '+state; }
+  function setProgress(pct, label) {
+    document.getElementById('progressBar').style.width = pct+'%';
+    document.getElementById('progressPct').textContent = pct+'%';
+    if (label) document.getElementById('progressLabel').textContent = label;
+  }
+  function showError(msg) { const el = document.getElementById('errorMsg'); el.textContent = msg; el.classList.add('show'); }
+  function setSyncStatus(state, msg) {
+    const el = document.getElementById('syncStatus');
+    el.className = 'sync-status ' + state;
+    el.textContent = msg;
+  }
+  function setEmpProgress(pct, label) {
+    document.getElementById('empProgressBar').style.width = pct+'%';
+    document.getElementById('empProgressPct').textContent = pct+'%';
+    if (label) document.getElementById('empProgressLabel').textContent = label;
+  }
+  function showEmpError(msg) { const el = document.getElementById('empErrorMsg'); el.textContent = msg; el.classList.add('show'); }
+  function setEmpSyncStatus(state, msg) {
+    const el = document.getElementById('empSyncStatus');
+    el.className = 'sync-status ' + state;
+    el.textContent = msg;
+  }
+  function readFile(file) {
+    return new Promise((res, rej) => {
+      const r = new FileReader();
+      r.onload = e => res(e.target.result);
+      r.onerror = () => rej(new Error('Failed to read ' + file.name));
+      r.readAsArrayBuffer(file);
+    });
+  }
+  function tick(ms=50) { return new Promise(r => setTimeout(r, ms)); }
+
+  // ── Biometric parser ──────────────────────────────────────────────────────
+  function parseBiometric(ab) {
+    const wb = XLSX.read(ab, { type: 'array', cellDates: false });
+    const ws = wb.Sheets['Consolidated'] || wb.Sheets['Sheet'] || wb.Sheets[wb.SheetNames[0]];
+    if (!ws) throw new Error('No valid sheet found in Biometric file.');
+    const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
+
+    let headerRowIdx = -1;
+    for (let i = 0; i < Math.min(raw.length, 8); i++) {
+      if (raw[i] && raw[i].some(c => String(c||'').trim() === 'User ID')) { headerRowIdx = i; break; }
+    }
+    if (headerRowIdx === -1) throw new Error('Header row with "User ID" not found.');
+
+    const headers = raw[headerRowIdx].map(h => String(h||'').trim());
+    const COL = {};
+    headers.forEach((h, i) => { COL[h] = i; });
+    const iUserID = COL['User ID'], iName = COL['Name'], iPunch = COL['Punch Time'];
+    const iDevice = COL['Device/Source Detail'], iMode = COL['Punch Mode'];
+    if (iUserID === undefined || iName === undefined || iPunch === undefined)
+      throw new Error(`Missing required columns. Found: ${headers.filter(Boolean).join(', ')}`);
+
+    function toDateStr(val) {
+      if (!val && val !== 0) return null;
+      if (typeof val === 'number') {
+        const d = new Date(Math.round((val - 25569) * 86400 * 1000));
+        const y = d.getUTCFullYear(), mo = String(d.getUTCMonth()+1).padStart(2,'0'), dy = String(d.getUTCDate()).padStart(2,'0');
+        if (y < 1990 || y > 2100) return null;
+        return `${y}-${mo}-${dy}`;
+      }
+      if (typeof val === 'string') {
+        const s = val.trim();
+        if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0,10);
+        const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+        if (m) return `${m[3]}-${String(m[2]).padStart(2,'0')}-${String(m[1]).padStart(2,'0')}`;
+      }
+      return null;
+    }
+
+    function toPunchTimeStr(val) {
+      if (!val && val !== 0) return null;
+      if (typeof val === 'number') {
+        let frac = val % 1; if (frac < 0) frac += 1;
+        const totalSec = Math.round(frac * 86400);
+        const h = Math.floor(totalSec/3600)%24, m = Math.floor((totalSec%3600)/60), s = totalSec%60;
+        return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+      }
+      if (typeof val === 'string') {
+        const s = val.trim();
+        const m = s.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+        if (m) return `${String(m[1]).padStart(2,'0')}:${m[2]}:${m[3]||'00'}`;
+        const dt = s.match(/\d{4}-\d{2}-\d{2}\s+(\d{2}:\d{2}(?::\d{2})?)/);
+        if (dt) return dt[1].length === 5 ? dt[1]+':00' : dt[1];
+      }
+      return null;
+    }
+
+    const allRecords = [];
+    let currentDate = null;
+    for (let r = headerRowIdx + 1; r < raw.length; r++) {
+      const row = raw[r];
+      if (!row || row.every(c => !c)) continue;
+      const rawUserID = row[iUserID], rawName = iName !== undefined ? row[iName] : null, rawPunch = iPunch !== undefined ? row[iPunch] : null;
+      const userIDStr = String(rawUserID||'').trim(), nameStr = String(rawName||'').trim();
+      const badUID = !rawUserID || ['','nan','NaT','NaN'].includes(userIDStr);
+      const badName = !rawName || nameStr === '' || nameStr === 'nan';
+      if (badUID || badName) {
+        for (let c = 0; c < row.length; c++) {
+          if (c === iUserID || c === iName) continue;
+          const ds = toDateStr(row[c]);
+          if (ds) { currentDate = ds; break; }
+        }
+        continue;
+      }
+      if (!rawPunch) continue;
+      const punchTimeStr = toPunchTimeStr(rawPunch);
+      if (!punchTimeStr) continue;
+      let rowDate = currentDate;
+      if (!rowDate && typeof rawPunch === 'number' && rawPunch > 1) rowDate = toDateStr(Math.floor(rawPunch));
+      const modeRaw = (iMode !== undefined) ? String(row[iMode]||'').trim() : '';
+      allRecords.push({
+        'User ID': userIDStr, 'Name': nameStr, 'Date': rowDate,
+        'Punch Time': punchTimeStr,
+        'Device/Source Detail': String(row[iDevice]||'').trim(),
+        'Punch Mode': modeRaw
+      });
+    }
+
+    let faceRecords = [], fpRecords = [];
+    if (iMode !== undefined) {
+      allRecords.forEach(r => {
+        const m = r['Punch Mode'].toLowerCase();
+        if (m.includes('face')) faceRecords.push(r);
+        else if (m !== '' && m !== 'nan') fpRecords.push(r);
+      });
+    } else { faceRecords = allRecords; }
+    return { faceRecords, fpRecords };
+  }
+
+  // ── GreatHR parser ────────────────────────────────────────────────────────
+  function parseGreatHR(ab) {
+    const wb = XLSX.read(ab, { type: 'array', cellDates: false });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
+    if (!raw.length) throw new Error('GreatHR file appears empty.');
+    const headers = raw[0].map(h => String(h||'').trim());
+    const COL = {}; headers.forEach((h, i) => { COL[h] = i; });
+    const iEmpNo = COL['Employee No'], iEmpName = COL['Employee Name'], iSwipe = COL['Swipe Date'];
+    const iShift = COL['Shift'], iDoor = COL['Door/Address'], iLocType = COL['Location Type'];
+    const iSwType = COL['Swipe Type'], iStatus = COL['Status'];
+
+    function parseSwipe(val) {
+      if (!val && val !== 0) return { date: null, time: null };
+      if (typeof val === 'string') {
+        const s = val.trim();
+        const months = {Jan:'01',Feb:'02',Mar:'03',Apr:'04',May:'05',Jun:'06',Jul:'07',Aug:'08',Sep:'09',Oct:'10',Nov:'11',Dec:'12'};
+        const m1 = s.match(/^(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})\s+(\d{2}:\d{2}(?::\d{2})?)/);
+        if (m1) { const mon=months[m1[2].slice(0,3)]||'01'; return{date:`${m1[3]}-${mon}-${String(m1[1]).padStart(2,'0')}`,time:m1[4].length===5?m1[4]+':00':m1[4]}; }
+        const m2 = s.match(/^(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}(?::\d{2})?)/);
+        if (m2) return { date: m2[1], time: m2[2].length===5?m2[2]+':00':m2[2] };
+      }
+      if (typeof val === 'number') {
+        const intPart = Math.floor(val), frac = val - intPart;
+        const d = new Date(Math.round((intPart-25569)*86400*1000));
+        const y=d.getUTCFullYear(),mo=String(d.getUTCMonth()+1).padStart(2,'0'),dy=String(d.getUTCDate()).padStart(2,'0');
+        const totalSec=Math.round(frac*86400),h=Math.floor(totalSec/3600)%24,m=Math.floor((totalSec%3600)/60),s=totalSec%60;
+        return{date:`${y}-${mo}-${dy}`,time:`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`};
+      }
+      return { date: null, time: null };
+    }
+
+    const records = [];
+    for (let r = 1; r < raw.length; r++) {
+      const row = raw[r];
+      if (!row) continue;
+      const empName = String(row[iEmpName]||'').trim();
+      if (!empName) continue;
+      const { date, time } = parseSwipe(row[iSwipe]);
+      if (!date) continue;
+      records.push({
+        'Employee No': String(row[iEmpNo]||'').trim(),
+        'Name': empName, 'Date': date, 'Punch Time': time,
+        'Shift': String(row[iShift]||'').trim(),
+        'Door/Address': String(row[iDoor]||'').trim(),
+        'Location Type': String(row[iLocType]||'').trim(),
+        'Swipe Type': String(row[iSwType]||'').trim(),
+        'Status': String(row[iStatus]||'').trim()
+      });
+    }
+    return records;
+  }
+
+  // ── build_summary ─────────────────────────────────────────────────────────
+  function buildSummary(records, idCol) {
+    const groups = {};
+    records.forEach(r => {
+      const key = `${r['Name']}||${r[idCol]}||${r['Date']}`;
+      if (!groups[key]) groups[key] = { name: r['Name'], uid: r[idCol], date: r['Date'], times: [] };
+      groups[key].times.push(r['Punch Time']);
+    });
+    const rows = [];
+    Object.values(groups).forEach(g => {
+      const times = g.times.slice().sort();
+      const firstIn = times[0].slice(0,5), lastOut = times[times.length-1].slice(0,5);
+      const toSec = t => { const [h,m,s] = t.split(':').map(Number); return h*3600+m*60+(s||0); };
+      const hours = Math.round((toSec(times[times.length-1])-toSec(times[0]))/3600*100)/100;
+      const row = { 'Name': g.name, 'Date': g.date, 'First_In': firstIn, 'Last_Out': lastOut, 'Hours': hours, 'Total_Punches': times.length };
+      row[idCol] = g.uid;
+      rows.push(row);
+    });
+    return rows;
+  }
+
+  // ── build_punches ─────────────────────────────────────────────────────────
+  function buildPunches(records, idCol, modeLabel, deviceCol) {
+    const groups = {};
+    records.forEach(r => {
+      const key = `${r['Name']}||${r[idCol]}||${r['Date']}`;
+      if (!groups[key]) groups[key] = { name: r['Name'], uid: r[idCol], date: r['Date'], entries: [] };
+      groups[key].entries.push(r);
+    });
+    const rows = [];
+    Object.values(groups).forEach(g => {
+      g.entries.sort((a,b) => a['Punch Time'].localeCompare(b['Punch Time']));
+      g.entries.forEach((e, i) => {
+        let device = '';
+        if (modeLabel === 'greathr') device = 'Great HR';
+        else if (deviceCol && e[deviceCol] !== undefined) {
+          const raw = String(e[deviceCol]||'').trim();
+          device = ['nan','NaT','NaN',''].includes(raw) ? '' : raw;
+        }
+        const row = { 'Name': g.name, 'Date': g.date, 'Time': e['Punch Time'], 'Seq': i+1, 'Mode': modeLabel, 'Device': device };
+        row[idCol] = g.uid;
+        rows.push(row);
+      });
+    });
+    return rows;
+  }
+
+  // ── Merge helpers ─────────────────────────────────────────────────────────
+  function mergeSummary(existing, incoming) {
+    const map = {};
+    existing.forEach(r => { map[`${r.Name}||${r.Date}`] = r; });
+    incoming.forEach(r => { map[`${r.Name}||${r.Date}`] = r; });
+    return Object.values(map);
+  }
+
+  function mergePunches(existing, incoming) {
+    const seen = new Set(existing.map(r => `${r.Name}||${r.Date}||${r.Time}||${r.Mode}`));
+    const toAdd = incoming.filter(r => !seen.has(`${r.Name}||${r.Date}||${r.Time}||${r.Mode}`));
+    return [...existing, ...toAdd];
+  }
+
+  // ── Six-month attendance retention ───────────────────────────────────────
+  // Removes attendance rows older than 6 months. Never applied to Employee Master.
+  function sixMonthsAgoStr() {
+    const d = new Date();
+    d.setMonth(d.getMonth() - 6);
+    const y = d.getFullYear(), mo = String(d.getMonth()+1).padStart(2,'0'), dy = String(d.getDate()).padStart(2,'0');
+    return `${y}-${mo}-${dy}`;
+  }
+  function applyRetention(rows, cutoff) {
+    return rows.filter(r => r.Date && r.Date >= cutoff);
+  }
+
+  // ── Read existing data from Firestore ─────────────────────────────────────
+  async function readExisting(key) {
+    try {
+      const chunks = await db.collection('attendance').doc(key).collection('chunks').orderBy('part').get();
+if (!chunks.empty) {
+    let all = [];
+    chunks.forEach(d => { all = all.concat(JSON.parse(d.data().data)); });
+    return all;
+}
+    } catch(e) {}
+    // Fall back to localStorage if Firestore fails
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : [];
+  }
+
+  // ── Write to Firestore + localStorage ─────────────────────────────────────
+  async function saveToCloud(key, data) {
+    const json = JSON.stringify(data);
+    try { localStorage.setItem(key, json); } catch(e) {}
+
+    // Split into chunks of 500 records each
+    const CHUNK = 500;
+    const batch = db.batch();
+    // Delete old chunks first
+    const old = await db.collection('attendance').doc(key).collection('chunks').get();
+    old.forEach(d => batch.delete(d.ref));
+    await batch.commit();
+
+    const chunks = [];
+    for (let i = 0; i < data.length; i += CHUNK) {
+        chunks.push(data.slice(i, i + CHUNK));
+    }
+    const b2 = db.batch();
+    chunks.forEach((chunk, i) => {
+        const ref = db.collection('attendance').doc(key).collection('chunks').doc(String(i));
+        b2.set(ref, { data: JSON.stringify(chunk), part: i });
+    });
+    await b2.commit();
+}
+
+  // ── Main process (Biometric + GreatHR — unchanged workflow, now with retention) ──
+  async function processFiles() {
+    document.getElementById('progressWrap').classList.add('show');
+    processBtn.disabled = true;
+    document.getElementById('errorMsg').classList.remove('show');
+    document.getElementById('syncStatus').className = 'sync-status';
+
+    try {
+      setStep(1,'active'); setProgress(5,'Reading Biometric file…');
+      const bioAB = await readFile(bioInput.files[0]);
+
+      setStep(1,'done'); setStep(2,'active'); setProgress(13,'Splitting Face vs Fingerprint…');
+      await tick();
+      const { faceRecords, fpRecords } = parseBiometric(bioAB);
+
+      setStep(2,'done'); setStep(3,'active'); setProgress(25,'Reading GreatHR file…');
+      const ghrAB = await readFile(ghrInput.files[0]);
+
+      setStep(3,'done'); setStep(4,'active'); setProgress(36,'Building daily summaries…');
+      await tick();
+      const ghrRecords = parseGreatHR(ghrAB);
+      const faceSummary = buildSummary(faceRecords, 'User ID');
+      const fpSummary   = buildSummary(fpRecords,   'User ID');
+      const ghrSummary  = buildSummary(ghrRecords,  'Employee No');
+
+      setStep(4,'done'); setStep(5,'active'); setProgress(48,'Building punch details…');
+      await tick();
+      const facePunches  = buildPunches(faceRecords, 'User ID',     'face',        'Device/Source Detail');
+      const fpPunches    = buildPunches(fpRecords,   'User ID',     'fingerprint', 'Device/Source Detail');
+      const ghrPunches   = buildPunches(ghrRecords,  'Employee No', 'greathr',     null);
+      const punchDetails = [...facePunches, ...fpPunches, ...ghrPunches];
+
+      setStep(5,'done'); setStep(6,'active'); setProgress(60,'Merging with existing data…');
+      await tick();
+      // Read existing data from cloud first
+      const [exFace, exFP, exGHR, exPunches] = await Promise.all([
+        readExisting('att_face_summary'),
+        readExisting('att_fingerprint_summary'),
+        readExisting('att_ghr_summary'),
+        readExisting('att_punch_details'),
+      ]);
+      let mergedFace    = mergeSummary(exFace,    faceSummary);
+      let mergedFP      = mergeSummary(exFP,      fpSummary);
+      let mergedGHR     = mergeSummary(exGHR,     ghrSummary);
+      let mergedPunches = mergePunches(exPunches, punchDetails);
+
+      setStep(6,'done'); setStep(7,'active'); setProgress(72,'Removing records older than 6 months…');
+      await tick();
+      const cutoff = sixMonthsAgoStr();
+      mergedFace    = applyRetention(mergedFace,    cutoff);
+      mergedFP      = applyRetention(mergedFP,      cutoff);
+      mergedGHR     = applyRetention(mergedGHR,     cutoff);
+      mergedPunches = applyRetention(mergedPunches, cutoff);
+
+      setStep(7,'done'); setStep(8,'active'); setProgress(85,'Syncing to cloud…');
+      setSyncStatus('syncing', '☁️ Uploading to cloud — please wait…');
+      await tick();
+
+      await Promise.all([
+        saveToCloud('att_face_summary',        mergedFace),
+        saveToCloud('att_fingerprint_summary', mergedFP),
+        saveToCloud('att_ghr_summary',         mergedGHR),
+        saveToCloud('att_punch_details',       mergedPunches),
+      ]);
+
+      setStep(8,'done'); setProgress(100,'Done!');
+      setSyncStatus('synced', `✓ Synced to cloud — all users will see updated data`);
+
+      console.log(`✅ Face        : ${faceSummary.length} new → ${mergedFace.length} total (after 6-month retention)`);
+      console.log(`✅ Fingerprint : ${fpSummary.length} new → ${mergedFP.length} total (after 6-month retention)`);
+      console.log(`✅ Great HR    : ${ghrSummary.length} new → ${mergedGHR.length} total (after 6-month retention)`);
+      console.log(`✅ Punches     : ${punchDetails.length} new → ${mergedPunches.length} total (after 6-month retention)`);
+
+      await tick(1500);
+      window.location.href = 'index.html';
+
+    } catch (err) {
+      setProgress(0,'Error');
+      showError('Error: ' + err.message);
+      setSyncStatus('error', '✗ Sync failed — check your internet connection');
+      processBtn.disabled = false;
+      console.error(err);
+    }
+  }
+
+  // ── Team name normalization ──────────────────────────────────────────────
+  // Collapses inconsistent casing/spacing/abbreviations into a single canonical Team name.
+  function normalizeTeam(raw) {
+    const s = String(raw||'').trim().toLowerCase().replace(/\s+/g,' ');
+    if (!s) return '';
+    const CANON = {
+      'sales': 'Sales',
+      'operations': 'Operations',
+      'ops': 'Operations',
+      'technical': 'Technical',
+      'tech': 'Technical',
+      'epos': 'EPOS',
+      'shared operations': 'Shared Operations',
+      'shared ops': 'Shared Operations',
+      'shared-ops': 'Shared Operations'
+    };
+    if (CANON[s]) return CANON[s];
+    // Fallback: title-case whatever was given so at least casing is consistent
+    return s.replace(/\b\w/g, c => c.toUpperCase());
+  }
+
+  // ── Employee Master parser ───────────────────────────────────────────────
+  function parseEmployeeMaster(ab) {
+    const wb = XLSX.read(ab, { type: 'array', cellDates: false });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    if (!ws) throw new Error('No valid sheet found in Employee Master file.');
+    const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
+    if (!raw.length) throw new Error('Employee Master file appears empty.');
+
+    const headers = raw[0].map(h => String(h||'').trim());
+    const COL = {}; headers.forEach((h, i) => { COL[h] = i; });
+    const iId = COL['Employee ID'], iName = COL['Employee Name'], iTeam = COL['Team'];
+    if (iId === undefined || iName === undefined || iTeam === undefined)
+      throw new Error(`Missing required columns. Expected "Employee ID", "Employee Name", "Team". Found: ${headers.filter(Boolean).join(', ')}`);
+
+    const rows = [];
+    for (let r = 1; r < raw.length; r++) {
+      const row = raw[r];
+      if (!row) continue;
+      const id = String(row[iId]||'').trim();
+      const name = String(row[iName]||'').trim();
+      if (!id && !name) continue;
+      rows.push({
+        'Employee ID': id,
+        'Employee Name': name,
+        'Team': normalizeTeam(row[iTeam])
+      });
+    }
+    return rows;
+  }
+
+  // ── Employee Master read/merge/save (separate store — never overwritten wholesale) ──
+  async function readEmployeeMaster() {
+    try {
+      const chunks = await db.collection('employeeMaster').doc('master').collection('chunks').orderBy('part').get();
+      if (!chunks.empty) {
+        let all = [];
+        chunks.forEach(d => { all = all.concat(JSON.parse(d.data().data)); });
+        return all;
+      }
+    } catch(e) {}
+    const raw = localStorage.getItem('emp_master');
+    return raw ? JSON.parse(raw) : [];
+  }
+
+  // Merge by Employee ID (fallback Employee Name). Existing employees not present
+  // in the new upload are left completely unchanged. No one is ever removed.
+  // Normalizes an Employee ID the same way att-data.js does (strips leading
+  // zeros from purely numeric IDs, leaves alphanumeric IDs like "SEC_001"
+  // untouched) so "076" and "76" are always recognized as the same person,
+  // even across separate Employee Master uploads.
+  function normalizeEmpId(id) {
+    const s = String(id||'').trim();
+    if (/^\d+$/.test(s)) return String(parseInt(s, 10));
+    return s;
+  }
+
+  function mergeEmployeeMaster(existing, incoming) {
+    const byId = {};
+    const byName = {};
+    existing.forEach(e => {
+      if (e['Employee ID']) byId[normalizeEmpId(e['Employee ID'])] = e;
+      else if (e['Employee Name']) byName[e['Employee Name']] = e;
+    });
+    incoming.forEach(inc => {
+      let key = null, bucket = null;
+      if (inc['Employee ID']) { key = normalizeEmpId(inc['Employee ID']); bucket = byId; }
+      else if (inc['Employee Name']) { key = inc['Employee Name']; bucket = byName; }
+      if (!key) return;
+      if (bucket[key]) {
+        // Update existing employee's info (e.g. Team change) — keep whichever
+        // Employee ID formatting was already stored, just refresh Name/Team.
+        bucket[key] = Object.assign({}, bucket[key], inc, { 'Employee ID': bucket[key]['Employee ID'] });
+      } else {
+        // New employee
+        bucket[key] = inc;
+      }
+    });
+    return [...Object.values(byId), ...Object.values(byName)];
+  }
+
+  async function saveEmployeeMaster(data) {
+    const json = JSON.stringify(data);
+    try { localStorage.setItem('emp_master', json); } catch(e) {}
+
+    const CHUNK = 500;
+    const batch = db.batch();
+    const old = await db.collection('employeeMaster').doc('master').collection('chunks').get();
+    old.forEach(d => batch.delete(d.ref));
+    await batch.commit();
+
+    const chunks = [];
+    for (let i = 0; i < data.length; i += CHUNK) chunks.push(data.slice(i, i + CHUNK));
+    const b2 = db.batch();
+    chunks.forEach((chunk, i) => {
+      const ref = db.collection('employeeMaster').doc('master').collection('chunks').doc(String(i));
+      b2.set(ref, { data: JSON.stringify(chunk), part: i });
+    });
+    await b2.commit();
+  }
+
+  // ── Employee Master process (independent of attendance import flow) ─────
+  async function processEmployeeMaster() {
+    document.getElementById('empProgressWrap').classList.add('show');
+    empBtn.disabled = true;
+    document.getElementById('empErrorMsg').classList.remove('show');
+    document.getElementById('empSyncStatus').className = 'sync-status';
+
+    try {
+      setEmpProgress(10, 'Reading Employee Master file…');
+      const ab = await readFile(empInput.files[0]);
+
+      setEmpProgress(35, 'Parsing and normalizing Team names…');
+      await tick();
+      const incoming = parseEmployeeMaster(ab);
+
+      setEmpProgress(55, 'Reading existing Employee Master…');
+      const existing = await readEmployeeMaster();
+
+      setEmpProgress(70, 'Merging (no employees removed)…');
+      await tick();
+      const merged = mergeEmployeeMaster(existing, incoming);
+
+      setEmpProgress(85, 'Syncing to cloud…');
+      setEmpSyncStatus('syncing', '☁️ Uploading Employee Master — please wait…');
+      await tick();
+      await saveEmployeeMaster(merged);
+
+      setEmpProgress(100, 'Done!');
+      setEmpSyncStatus('synced', `✓ Employee Master synced — ${merged.length} employees total`);
+      console.log(`✅ Employee Master: ${incoming.length} in upload → ${merged.length} total after merge`);
+
+    } catch (err) {
+      setEmpProgress(0, 'Error');
+      showEmpError('Error: ' + err.message);
+      setEmpSyncStatus('error', '✗ Sync failed — check your internet connection');
+      empBtn.disabled = false;
+      console.error(err);
+    }
+  }
+  </script>
+</body>
+</html>
