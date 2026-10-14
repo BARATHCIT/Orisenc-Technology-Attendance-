@@ -1,21 +1,21 @@
 /**
  * att-data.js
  * Intercepts fetch() calls for the dashboard JSON files.
- * Reads from Firestore (cloud) with localStorage as fallback/cache.
+ * Reads from the local PC server (server.js) with localStorage as fallback/cache
+ * in case the server isn't reachable.
  *
- * Attendance files intercepted (stored under collection "attendance"):
+ * Attendance files intercepted (stored under data/attendance/<key>.json on the server):
  *   face_summary.json        ← att_face_summary
  *   fingerprint_summary.json ← att_fingerprint_summary
  *   greathr_summary.json     ← att_ghr_summary
  *   punch_details.json       ← att_punch_details
  *
- * Reference file intercepted (stored under its own collection "employeeMaster",
- * completely separate from attendance data so it is never affected by the
- * 6-month attendance retention cleanup):
- *   employee_master.json     ← employeeMaster/master
+ * Reference file intercepted (stored separately at data/employee_master.json,
+ * so it is never affected by the 6-month attendance retention cleanup):
+ *   employee_master.json     ← /api/employee-master
  *
- * Add <script src="firebase-config.js"></script> BEFORE this file in each page.
- * Add <script src="att-data.js"></script>        in <head> of all dashboard pages.
+ * Add <script src="server-config.js"></script> BEFORE this file in each page.
+ * Add <script src="att-data.js"></script>       in <head> of all dashboard pages.
  */
 
 
@@ -69,25 +69,15 @@
     return id != null ? normalizeId(id) : '';
   }
 
-  // ── Firestore helpers ────────────────────────────────────────────────────
-  // Firestore splits large arrays into chunks (max 1 MB per document).
-  // We store each dataset as:
-  //   collection: <store>          e.g. "attendance" or "employeeMaster"
-  //   document:   <key>            e.g. "att_face_summary" or "master"
-  //   subcollection: "chunks"      each doc holds { data: <json string>, part: n }
+  // ── Local PC server helpers ──────────────────────────────────────────────
+  // server.js exposes:
+  //   GET /api/attendance/:key   → JSON array for that attendance dataset
+  //   GET /api/employee-master   → JSON array of Employee Master rows
+  // SERVER_BASE_URL comes from server-config.js. Leave it blank ('') to use
+  // the same host that served the page (the normal case on the host PC).
 
-  let _db = null;
-
-  function getDb() {
-    if (_db) return _db;
-    try {
-      const app = firebase.app();
-      _db = firebase.firestore(app);
-    } catch (e) {
-      // Firebase not initialised yet — will fall back to localStorage
-      _db = null;
-    }
-    return _db;
+  function apiBase() {
+    return (typeof SERVER_BASE_URL !== 'undefined' && SERVER_BASE_URL) ? SERVER_BASE_URL : '';
   }
 
   // localStorage cache key is namespaced by store so employee master and
@@ -96,18 +86,18 @@
     return store === 'employeeMaster' ? 'emp_master' : key;
   }
 
-  async function readFromFirestore(store, key) {
-    const db = getDb();
-    if (!db) return null;
+  async function readFromServer(store, key) {
     try {
-      const chunks = await db.collection(store).doc(key).collection('chunks').orderBy('part').get();
-      if (chunks.empty) return null;
-      let all = [];
-      chunks.forEach(d => { all = all.concat(JSON.parse(d.data().data)); });
-      try { localStorage.setItem(cacheKey(store, key), JSON.stringify(all)); } catch(e){}
-      return all;
+      const path = store === 'employeeMaster'
+        ? '/api/employee-master'
+        : '/api/attendance/' + encodeURIComponent(key);
+      const res = await _fetch(apiBase() + path);
+      if (!res.ok) return null;
+      const data = await res.json();
+      try { localStorage.setItem(cacheKey(store, key), JSON.stringify(data)); } catch(e){}
+      return data;
     } catch (e) {
-      console.warn('Firestore read failed, falling back to localStorage:', e.message);
+      console.warn('Local server read failed, falling back to localStorage:', e.message);
       return null;
     }
   }
@@ -125,8 +115,8 @@
     const entry = MAP[filename];
     if (!entry) return _fetch(url, opts);
 
-    // Try Firestore first, fall back to localStorage
-    return readFromFirestore(entry.store, entry.key).then(data => {
+    // Try the local server first, fall back to localStorage
+    return readFromServer(entry.store, entry.key).then(data => {
       const result = data || readFromLocalStorage(entry.store, entry.key);
       return {
         ok:   true,
@@ -144,7 +134,7 @@
   // attendance record in storage.
 
   async function getEmployeeMaster() {
-    const data = await readFromFirestore('employeeMaster', 'master');
+    const data = await readFromServer('employeeMaster', 'master');
     return data || readFromLocalStorage('employeeMaster', 'master');
   }
 

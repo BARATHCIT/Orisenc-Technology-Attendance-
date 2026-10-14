@@ -1,10 +1,7 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="light">
 <head>
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
-<script src="firebase-config.js"></script>
-<script>if(!firebase.apps.length){firebase.initializeApp(firebaseConfig);}</script>
+<script src="server-config.js"></script>
 <script src="att-data.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -64,6 +61,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 .tab:last-child{border-radius:0 8px 8px 0;}
 .tab:not(:first-child){border-left:none;}
 .tab.active-face{background:#6c63ff;color:#fff;border-color:#6c63ff;}
+.tab.active-all{background:#2563eb;color:#fff;border-color:#2563eb;}
 .tab.active-fingerprint{background:#00c9a7;color:#fff;border-color:#00c9a7;}
 .tab.active-greathr{background:#7c3aed;color:#fff;border-color:#7c3aed;}
 .tab:not([class*="active"]):hover{color:var(--text);}
@@ -143,6 +141,10 @@ tbody tr:hover .badge{
 .badge-half{background:rgba(255,179,71,.12);color:var(--amber);}.badge-half::before{background:var(--amber);}
 .badge-short{background:rgba(255,101,132,.12);color:var(--accent2);}.badge-short::before{background:var(--accent2);}
 .tfoot-row{padding:10px 16px;background:var(--foot-bg);border-top:1px solid var(--border);font-size:13px;color:var(--muted);display:flex;justify-content:space-between;}
+.pager{display:flex;align-items:center;gap:8px;}
+.pager button{height:30px;padding:0 12px;background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:7px;cursor:pointer;font:600 12px 'Inter',sans-serif;}
+.pager button:hover:not(:disabled){border-color:var(--accent);color:var(--accent);}
+.pager button:disabled{opacity:.4;cursor:not-allowed;}
 .no-data{text-align:center;padding:56px;color:var(--muted);}
 .no-data small{display:block;font-size:13px;margin-top:6px;}
 
@@ -214,7 +216,8 @@ tbody tr:hover .badge{
 </div>
 
 <div class="tabs">
-  <div class="tab active-face"  id="tab-face"        onclick="switchMode('face')">👤 Face</div>
+  <div class="tab active-all"   id="tab-all"         onclick="switchMode('all')">🔀 All</div>
+  <div class="tab"              id="tab-face"        onclick="switchMode('face')">👤 Face</div>
   <div class="tab"              id="tab-fingerprint" onclick="switchMode('fingerprint')">🖐 Fingerprint</div>
   <div class="tab"              id="tab-greathr"     onclick="switchMode('greathr')">📱 Great HR</div>
   <div style="margin-left:auto;display:flex;gap:10px;align-items:center;padding-bottom:2px;">
@@ -225,15 +228,15 @@ tbody tr:hover .badge{
 </div>
 
 <div class="controls">
-  <input type="text"  id="search"   placeholder="🔍 Name or Employee ID…" oninput="render()">
+  <input type="text"  id="search"   placeholder="🔍 Name or Employee ID…" oninput="resetPageAndRender()">
   <div class="sep"></div>
-  <label>From</label><input type="date" id="dateFrom" onchange="render()">
-  <label>To</label>  <input type="date" id="dateTo"   onchange="render()">
+  <label>From</label><input type="date" id="dateFrom" onchange="resetPageAndRender()">
+  <label>To</label>  <input type="date" id="dateTo"   onchange="resetPageAndRender()">
   <div class="sep"></div>
-  <select id="teamFilter" onchange="render()">
+  <select id="teamFilter" onchange="resetPageAndRender()">
     <option value="">All Teams</option>
   </select>
-  <select id="monthFilter" onchange="render()">
+  <select id="monthFilter" onchange="resetPageAndRender()">
     <option value="">All Months</option>
   </select>
   <div class="sep"></div>
@@ -253,7 +256,7 @@ tbody tr:hover .badge{
       <tr>
         <th>#</th><th>Emp ID</th>
         <th class="sortable" data-sort="employee" onclick="setSort('employee')">Employee<span class="sort-ind" id="sort-ind-employee"></span></th>
-        <th>Team</th>
+        <th>Team</th><th>Source</th>
         <th class="sortable" data-sort="date" onclick="setSort('date')">Date<span class="sort-ind" id="sort-ind-date"></span></th>
         <th>First In</th><th>Last Out</th>
         <th class="sortable" data-sort="hours" onclick="setSort('hours')">Hours<span class="sort-ind" id="sort-ind-hours"></span></th>
@@ -262,12 +265,16 @@ tbody tr:hover .badge{
       </tr>
     </thead>
     <tbody id="tbody">
-      <tr><td colspan="10"><div class="no-data">Loading records…</div></td></tr>
+      <tr><td colspan="11"><div class="no-data">Loading records…</div></td></tr>
     </tbody>
   </table>
   <div class="tfoot-row">
     <span id="foot-left">—</span>
-    <span>Click any row to see punch details for that day</span>
+    <span class="pager">
+      <button id="prev-page" onclick="changePage(-1)">← Previous</button>
+      <span id="page-info">—</span>
+      <button id="next-page" onclick="changePage(1)">Next →</button>
+    </span>
   </div>
 </div>
 
@@ -327,10 +334,14 @@ tbody tr:hover .badge{
 </div><!-- /panel -->
 
 <script>
-let faceData=[], fpData=[], ghrData=[], punchData=[];
+let faceData=[], fpData=[], ghrData=[], allData=[], punchData=[];
 let teamLookup = {byId:{}, byName:{}};
-let currentMode = "face";
+let punchIndex = new Map();
+let currentMode = "all";
 let panelContext = null; // {name, date, uid}
+let renderSequence = 0;
+let currentPage = 1;
+const PAGE_SIZE = 100;
 
 /* ── Sort state (replaces old Sort dropdown) ──
    column: 'employee' | 'date' | 'hours' | 'punches'
@@ -367,6 +378,26 @@ function populateMonthFilter(){
   if(months.includes(prevVal)) sel.value = prevVal;
 }
 
+/* Build once after loading instead of scanning every punch for every table row.
+   With large imports this turns a tab switch from rows × all punches into
+   rows × punches for just that employee/day. */
+function punchKey(name, date){
+  return `${name || ""}\u0000${date || ""}`;
+}
+function buildPunchIndex(){
+  punchIndex = new Map();
+  punchData.forEach(p=>{
+    const date = (p.Date||"").toString().slice(0,10);
+    const key = punchKey(p.Name, date);
+    let rows = punchIndex.get(key);
+    if(!rows){ rows=[]; punchIndex.set(key, rows); }
+    rows.push(p);
+  });
+}
+function getPunchesForDay(name, date){
+  return punchIndex.get(punchKey(name, date)) || [];
+}
+
 /* ── Load data ── */
 Promise.all([
   fetch("face_summary.json").then(r=>r.json()),
@@ -376,6 +407,12 @@ Promise.all([
   window.AttData ? window.AttData.buildTeamLookup() : Promise.resolve({byId:{},byName:{}}),
 ]).then(([f,fp,g,pd,tl])=>{
   faceData=f; fpData=fp; ghrData=g; punchData=pd; teamLookup=tl;
+  allData=[
+    ...faceData.map(r=>({...r,_mode:'face'})),
+    ...fpData.map(r=>({...r,_mode:'fingerprint'})),
+    ...ghrData.map(r=>({...r,_mode:'greathr'}))
+  ];
+  buildPunchIndex();
   populateTeamFilter();
   populateMonthFilter();
   const time = new Date().toLocaleTimeString("en-IN",{
@@ -390,14 +427,15 @@ document.getElementById("updated").innerHTML =
 </div>`;
   render();
 }).catch(()=>{
-  document.getElementById("tbody").innerHTML=`<tr><td colspan="10"><div class="no-data">⚠ Could not load JSON files<small>Run python attendance.py then python -m http.server 8000</small></div></td></tr>`;
+  document.getElementById("tbody").innerHTML=`<tr><td colspan="11"><div class="no-data">⚠ Could not load JSON files<small>Run the local Node server and refresh this page</small></div></td></tr>`;
   document.getElementById("count-pill").textContent="Error";
 });
 
 /* ── Mode switch ── */
 function switchMode(mode){
   currentMode=mode;
-  ["face","fingerprint","greathr"].forEach(m=>{
+  currentPage=1;
+  ["all","face","fingerprint","greathr"].forEach(m=>{
     document.getElementById("tab-"+m).className="tab"+(m===mode?" active-"+m:"");
   });
   render();
@@ -412,6 +450,7 @@ function formatHours(hours){
     return `${hours.toFixed(1).replace(/\.0$/,"")}h`;
 }
 function currentData(){
+  if(currentMode==="all")         return allData;
   if(currentMode==="face")        return faceData;
   if(currentMode==="fingerprint") return fpData;
   return ghrData;
@@ -423,7 +462,7 @@ function formatDateLong(d){if(!d)return"—";return new Date(d+"T00:00:00").toLo
 /* ── Cross-mode helpers ── */
 // Returns {firstIn, lastOut, hours, totalPunches, modePunches} for a given name+date
 function getCrossModeTimes(name, date, mode) {
-  const allForDay = punchData.filter(p => p.Name === name && (p.Date||"").slice(0,10) === date);
+  const allForDay = getPunchesForDay(name, date);
   const modePunches = allForDay.filter(p => p.Mode === mode).length;
   const totalPunches = allForDay.length;
 
@@ -468,6 +507,11 @@ function statusBadgeForDate(hoursNum, dateStr) {
   if (hoursNum >= half) return ["badge-half", "Half day"];
   return ["badge-short", "Short"];
 }
+function sourcePill(mode){
+  if(mode==="face") return `<span class="mode-pill mode-face">👤 Face</span>`;
+  if(mode==="fingerprint") return `<span class="mode-pill mode-fp">🖐 Fingerprint</span>`;
+  return `<span class="mode-pill mode-ghr">📱 Great HR</span>`;
+}
 
 /* ── Column sorting (replaces old Sort dropdown) ── */
 function setSort(column){
@@ -477,7 +521,17 @@ function setSort(column){
     sortState.column = column;
     sortState.direction = 'asc'; // every column starts Low→High / A→Z / Oldest→Newest on first click
   }
+  currentPage=1;
   render();
+}
+function resetPageAndRender(){
+  currentPage=1;
+  render();
+}
+function changePage(delta){
+  currentPage+=delta;
+  render();
+  document.querySelector('.table-wrap')?.scrollIntoView({behavior:'smooth',block:'start'});
 }
 function updateSortIndicators(){
   ['employee','date','hours','punches'].forEach(col=>{
@@ -489,6 +543,9 @@ function updateSortIndicators(){
 
 /* ── Main table render ── */
 function render(){
+  const renderId = ++renderSequence;
+  const renderMode = currentMode;
+  const startedAt = performance.now();
   const search   = document.getElementById("search").value.toLowerCase().trim();
   const dateFrom = document.getElementById("dateFrom").value;
   const dateTo   = document.getElementById("dateTo").value;
@@ -510,16 +567,19 @@ function render(){
     }
     return true;
   });
+  const filteredAt = performance.now();
 
   // Enrich each record with cross-mode times and Team before sorting
   const enriched = data.map(r => {
     const date = (r.Date||"").toString().slice(0,10);
-    const times = getCrossModeTimes(r.Name, date, currentMode);
+    const rowMode = currentMode==="all" ? r._mode : currentMode;
+    const times = getCrossModeTimes(r.Name, date, rowMode);
     const uidRaw = r["User ID"]||r["Employee No"]||"";
     const team = window.AttData ? window.AttData.getTeam(teamLookup, uidRaw, r.Name) : "";
-    return { ...r, _firstIn: times.firstIn, _lastOut: times.lastOut, _hours: times.hours,
+    return { ...r, _source: rowMode, _firstIn: times.firstIn, _lastOut: times.lastOut, _hours: times.hours,
              _totalPunches: times.totalPunches, _modePunches: times.modePunches, _team: team };
   });
+  const enrichedAt = performance.now();
 
   enriched.sort((a,b)=>{
     let cmp = 0;
@@ -536,6 +596,12 @@ function render(){
     }
     return sortState.direction === 'desc' ? -cmp : cmp;
   });
+  const sortedAt = performance.now();
+
+  const totalPages = Math.max(1, Math.ceil(enriched.length / PAGE_SIZE));
+  currentPage = Math.min(Math.max(1, currentPage), totalPages);
+  const pageStart = (currentPage-1)*PAGE_SIZE;
+  const pageRows = enriched.slice(pageStart, pageStart+PAGE_SIZE);
 
   updateSortIndicators();
 
@@ -546,15 +612,20 @@ document.getElementById("count-pill").textContent=
 shown===total
 ?`${fmt(total)} records`
 :`${fmt(shown)} of ${fmt(total)}`;
-  document.getElementById("foot-left").textContent=`${shown} record${shown!==1?"s":""} · click any row for punch details`;
+  const rangeStart = shown ? pageStart+1 : 0;
+  const rangeEnd = Math.min(pageStart+PAGE_SIZE, shown);
+  document.getElementById("foot-left").textContent=`Showing ${rangeStart}–${rangeEnd} of ${shown} record${shown!==1?"s":""}`;
+  document.getElementById("page-info").textContent=`Page ${currentPage} of ${totalPages}`;
+  document.getElementById("prev-page").disabled=currentPage<=1;
+  document.getElementById("next-page").disabled=currentPage>=totalPages;
 
   const tbody=document.getElementById("tbody");
   if(!enriched.length){
-    tbody.innerHTML=`<tr><td colspan="10"><div class="no-data">No records match your filters<small>Try adjusting the date range or search term</small></div></td></tr>`;
+    tbody.innerHTML=`<tr><td colspan="11"><div class="no-data">No records match your filters<small>Try adjusting the date range or search term</small></div></td></tr>`;
     return;
   }
 
-  tbody.innerHTML=enriched.map((r,i)=>{
+  const html = pageRows.map((r,i)=>{
     const hours = r._hours;
     const hoursNum = (hours === "—" || hours === undefined) ? 0 : Number(hours);
     const [cls,label]=statusBadgeForDate(hoursNum, (r.Date||"").toString().slice(0,10));    const uid=r["User ID"]||r["Employee No"]||"";
@@ -563,10 +634,11 @@ shown===total
     const pnchHtml = `<span class="pnch-mode">${r._modePunches}</span><span class="pnch-sep">/</span><span class="pnch-total">${r._totalPunches}</span>`;
     const teamHtml = r._team ? `<span class="team-pill">${r._team}</span>` : `<span style="color:var(--muted)">—</span>`;
     return`<tr onclick="openPanel('${(r.Name||"").replace(/'/g,"\\'")}','${safeDate}','${(uid).toString().replace(/'/g,"\\'")}')">
-      <td>${i+1}</td>
+      <td>${pageStart+i+1}</td>
       <td class="emp-id-col">${uid||"—"}</td>
       <td><div class="emp">${r.Name||"—"}</div></td>
       <td>${teamHtml}</td>
+      <td>${sourcePill(r._source)}</td>
       <td><div class="date-val">${formatDate(r.Date)}</div></td>
       <td>${(()=>{const s=getLoginStatus(r._firstIn);return s?`<span style="color:${s.color};font-weight:600;cursor:default" title="${s.tooltip}">${window.AttData.formatTime12h(r._firstIn)}</span>`:`<span style="color:var(--muted)">—</span>`;})()}</td>
       <td class="t-out">${window.AttData.formatTime12h(r._lastOut)}</td>
@@ -575,13 +647,33 @@ shown===total
       <td><span class="badge ${cls}">${label}</span></td>
     </tr>`;
   }).join("");
+  const htmlAt = performance.now();
+  tbody.innerHTML=html;
+  const domAt = performance.now();
+
+  const timing = {
+    mode: renderMode,
+    rows: pageRows.length,
+    matchedRows: enriched.length,
+    filterMs: +(filteredAt-startedAt).toFixed(1),
+    enrichMs: +(enrichedAt-filteredAt).toFixed(1),
+    sortMs: +(sortedAt-enrichedAt).toFixed(1),
+    htmlMs: +(htmlAt-sortedAt).toFixed(1),
+    domInsertMs: +(domAt-htmlAt).toFixed(1),
+    syncTotalMs: +(domAt-startedAt).toFixed(1)
+  };
+  console.log(`[Attendance perf #${renderId}] ${JSON.stringify(timing)}`);
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    timing.paintTotalMs = +(performance.now()-startedAt).toFixed(1);
+    console.log(`[Attendance perf paint #${renderId}] ${JSON.stringify(timing)}`);
+  }));
 }
 
 /* ── Panel open — scoped to a single day ── */
 function openPanel(name, date, uid){
   panelContext = {name, date, uid};
 
-  const allForDay = punchData.filter(p => p.Name === name && (p.Date||"").slice(0,10) === date);
+  const allForDay = getPunchesForDay(name, date);
   const totalPunches = allForDay.length;
 
   const officialTimes = allForDay
@@ -619,11 +711,7 @@ function renderPunchTable(){
   if(!panelContext) return;
   const {name, date} = panelContext;
 
-  let rows = punchData.filter(p=>{
-    if(p.Name !== name) return false;
-    if((p.Date||"").slice(0,10) !== date) return false;
-    return true;
-  });
+  let rows = getPunchesForDay(name, date).slice();
 
   rows.sort((a,b)=>a.Time.localeCompare(b.Time));
 
@@ -669,6 +757,7 @@ function clearFilters(){
   document.getElementById("teamFilter").value="";
   document.getElementById("monthFilter").value="";
   sortState = { column: 'date', direction: 'desc' };
+  currentPage=1;
   render();
 }
 
@@ -721,7 +810,7 @@ async function downloadExcel() {
 
     const worksheet = workbook.addWorksheet("Attendance");
 
-    worksheet.mergeCells("A1:I1");
+    worksheet.mergeCells("A1:J1");
 
     worksheet.getCell("A1").value =
         "Orisenc Technologies - Attendance Report";
@@ -748,6 +837,7 @@ async function downloadExcel() {
         "Employee ID",
         "Employee",
         "Team",
+        "Source",
         "Date",
         "First In",
         "Last Out",
@@ -778,10 +868,11 @@ async function downloadExcel() {
 
         const date = (r.Date || "").slice(0,10);
 
+        const rowMode = currentMode === "all" ? r._mode : currentMode;
         const times = getCrossModeTimes(
             r.Name,
             date,
-            currentMode
+            rowMode
         );
 
         const team = window.AttData.getTeam(
@@ -799,6 +890,7 @@ async function downloadExcel() {
             r["User ID"] || r["Employee No"] || "",
             r.Name,
             team,
+            rowMode === "face" ? "Face" : rowMode === "fingerprint" ? "Fingerprint" : "Great HR",
             date,
             times.firstIn,
             times.lastOut,
@@ -829,7 +921,7 @@ async function downloadExcel() {
 
                 if(hour > 9 || (hour === 9 && minute >= 46)){
 
-                    const c = row.getCell(5);
+                    const c = row.getCell(6);
 
                     c.fill = {
                         type: "pattern",
@@ -850,7 +942,7 @@ async function downloadExcel() {
 
         // -------- STATUS COLORS --------
 
-        const statusCell = row.getCell(9);
+        const statusCell = row.getCell(10);
 
         if(status === "Present"){
 

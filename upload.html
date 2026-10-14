@@ -6,18 +6,8 @@
   <title>Import Centre — Attendance</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 
-  <!-- Firebase v8 compat (CDN — no build step needed) -->
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
-  <!-- Your project credentials — fill in firebase-config.js -->
-  <script src="firebase-config.js"></script>
-  <script>
-    // Initialise Firebase once
-    if (!firebase.apps.length) {
-      firebase.initializeApp(firebaseConfig);
-    }
-    const db = firebase.firestore();
-  </script>
+  <!-- Local PC server connection settings (SERVER_BASE_URL) -->
+  <script src="server-config.js"></script>
 
   <style>
     :root{
@@ -127,7 +117,7 @@
         <div class="step" id="step5"><div class="step-dot"></div>Building punch details</div>
         <div class="step" id="step6"><div class="step-dot"></div>Merging with existing data</div>
         <div class="step" id="step7"><div class="step-dot"></div>Removing records older than 6 months</div>
-        <div class="step" id="step8"><div class="step-dot"></div>Syncing to cloud</div>
+        <div class="step" id="step8"><div class="step-dot"></div>Saving to local server</div>
       </div>
     </div>
 
@@ -172,19 +162,24 @@
   const empInput   = document.getElementById('empFile');
   const empBtn     = document.getElementById('empBtn');
 
-  // Check if cloud data exists
-  db.collection('attendance').doc('att_face_summary').get().then(doc => {
-    if (doc.exists) {
-      document.getElementById('cachedBanner').classList.add('show');
-      document.getElementById('goDash').style.display = 'block';
+  // Check if local server (or localStorage fallback) already has synced data
+  (async () => {
+    try {
+      const base = (typeof SERVER_BASE_URL !== 'undefined' && SERVER_BASE_URL) ? SERVER_BASE_URL : '';
+      const res = await fetch(base + '/api/attendance/att_face_summary');
+      if (res.ok) {
+        document.getElementById('cachedBanner').classList.add('show');
+        document.getElementById('goDash').style.display = 'block';
+        return;
+      }
+    } catch (e) {
+      // Local server unreachable — fall through to localStorage check
     }
-  }).catch(() => {
-    // Offline or config not set — check localStorage fallback
     if (localStorage.getItem('att_face_summary')) {
       document.getElementById('cachedBanner').classList.add('show');
       document.getElementById('goDash').style.display = 'block';
     }
-  });
+  })();
 
   function setupZone(input, zone, nameEl, onReady) {
     input.addEventListener('change', () => {
@@ -463,45 +458,32 @@
     return rows.filter(r => r.Date && r.Date >= cutoff);
   }
 
-  // ── Read existing data from Firestore ─────────────────────────────────────
+  // ── Read existing data from the local PC server ───────────────────────────
+  function apiBase() {
+    return (typeof SERVER_BASE_URL !== 'undefined' && SERVER_BASE_URL) ? SERVER_BASE_URL : '';
+  }
   async function readExisting(key) {
     try {
-      const chunks = await db.collection('attendance').doc(key).collection('chunks').orderBy('part').get();
-if (!chunks.empty) {
-    let all = [];
-    chunks.forEach(d => { all = all.concat(JSON.parse(d.data().data)); });
-    return all;
-}
+      const res = await fetch(apiBase() + '/api/attendance/' + encodeURIComponent(key));
+      if (res.ok) return await res.json();
     } catch(e) {}
-    // Fall back to localStorage if Firestore fails
+    // Fall back to localStorage if the server isn't reachable
     const raw = localStorage.getItem(key);
     return raw ? JSON.parse(raw) : [];
   }
 
-  // ── Write to Firestore + localStorage ─────────────────────────────────────
+  // ── Write to the local PC server (+ localStorage cache) ───────────────────
   async function saveToCloud(key, data) {
     const json = JSON.stringify(data);
     try { localStorage.setItem(key, json); } catch(e) {}
 
-    // Split into chunks of 500 records each
-    const CHUNK = 500;
-    const batch = db.batch();
-    // Delete old chunks first
-    const old = await db.collection('attendance').doc(key).collection('chunks').get();
-    old.forEach(d => batch.delete(d.ref));
-    await batch.commit();
-
-    const chunks = [];
-    for (let i = 0; i < data.length; i += CHUNK) {
-        chunks.push(data.slice(i, i + CHUNK));
-    }
-    const b2 = db.batch();
-    chunks.forEach((chunk, i) => {
-        const ref = db.collection('attendance').doc(key).collection('chunks').doc(String(i));
-        b2.set(ref, { data: JSON.stringify(chunk), part: i });
+    const res = await fetch(apiBase() + '/api/attendance/' + encodeURIComponent(key), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: json,
     });
-    await b2.commit();
-}
+    if (!res.ok) throw new Error('Local server save failed (' + res.status + ')');
+  }
 
   // ── Main process (Biometric + GreatHR — unchanged workflow, now with retention) ──
   async function processFiles() {
@@ -537,7 +519,7 @@ if (!chunks.empty) {
 
       setStep(5,'done'); setStep(6,'active'); setProgress(60,'Merging with existing data…');
       await tick();
-      // Read existing data from cloud first
+      // Read existing data from the local server first
       const [exFace, exFP, exGHR, exPunches] = await Promise.all([
         readExisting('att_face_summary'),
         readExisting('att_fingerprint_summary'),
@@ -557,8 +539,8 @@ if (!chunks.empty) {
       mergedGHR     = applyRetention(mergedGHR,     cutoff);
       mergedPunches = applyRetention(mergedPunches, cutoff);
 
-      setStep(7,'done'); setStep(8,'active'); setProgress(85,'Syncing to cloud…');
-      setSyncStatus('syncing', '☁️ Uploading to cloud — please wait…');
+      setStep(7,'done'); setStep(8,'active'); setProgress(85,'Saving to local server…');
+      setSyncStatus('syncing', '💾 Saving to local server — please wait…');
       await tick();
 
       await Promise.all([
@@ -569,7 +551,7 @@ if (!chunks.empty) {
       ]);
 
       setStep(8,'done'); setProgress(100,'Done!');
-      setSyncStatus('synced', `✓ Synced to cloud — all users will see updated data`);
+      setSyncStatus('synced', `✓ Saved to local server — all devices on this network will see updated data`);
 
       console.log(`✅ Face        : ${faceSummary.length} new → ${mergedFace.length} total (after 6-month retention)`);
       console.log(`✅ Fingerprint : ${fpSummary.length} new → ${mergedFP.length} total (after 6-month retention)`);
@@ -582,7 +564,7 @@ if (!chunks.empty) {
     } catch (err) {
       setProgress(0,'Error');
       showError('Error: ' + err.message);
-      setSyncStatus('error', '✗ Sync failed — check your internet connection');
+      setSyncStatus('error', '✗ Save failed — check that the local server (node server.js) is running');
       processBtn.disabled = false;
       console.error(err);
     }
@@ -642,12 +624,8 @@ if (!chunks.empty) {
   // ── Employee Master read/merge/save (separate store — never overwritten wholesale) ──
   async function readEmployeeMaster() {
     try {
-      const chunks = await db.collection('employeeMaster').doc('master').collection('chunks').orderBy('part').get();
-      if (!chunks.empty) {
-        let all = [];
-        chunks.forEach(d => { all = all.concat(JSON.parse(d.data().data)); });
-        return all;
-      }
+      const res = await fetch(apiBase() + '/api/employee-master');
+      if (res.ok) return await res.json();
     } catch(e) {}
     const raw = localStorage.getItem('emp_master');
     return raw ? JSON.parse(raw) : [];
@@ -693,20 +671,12 @@ if (!chunks.empty) {
     const json = JSON.stringify(data);
     try { localStorage.setItem('emp_master', json); } catch(e) {}
 
-    const CHUNK = 500;
-    const batch = db.batch();
-    const old = await db.collection('employeeMaster').doc('master').collection('chunks').get();
-    old.forEach(d => batch.delete(d.ref));
-    await batch.commit();
-
-    const chunks = [];
-    for (let i = 0; i < data.length; i += CHUNK) chunks.push(data.slice(i, i + CHUNK));
-    const b2 = db.batch();
-    chunks.forEach((chunk, i) => {
-      const ref = db.collection('employeeMaster').doc('master').collection('chunks').doc(String(i));
-      b2.set(ref, { data: JSON.stringify(chunk), part: i });
+    const res = await fetch(apiBase() + '/api/employee-master', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: json,
     });
-    await b2.commit();
+    if (!res.ok) throw new Error('Local server save failed (' + res.status + ')');
   }
 
   // ── Employee Master process (independent of attendance import flow) ─────
@@ -731,8 +701,8 @@ if (!chunks.empty) {
       await tick();
       const merged = mergeEmployeeMaster(existing, incoming);
 
-      setEmpProgress(85, 'Syncing to cloud…');
-      setEmpSyncStatus('syncing', '☁️ Uploading Employee Master — please wait…');
+      setEmpProgress(85, 'Saving to local server…');
+      setEmpSyncStatus('syncing', '💾 Saving Employee Master — please wait…');
       await tick();
       await saveEmployeeMaster(merged);
 
@@ -743,7 +713,7 @@ if (!chunks.empty) {
     } catch (err) {
       setEmpProgress(0, 'Error');
       showEmpError('Error: ' + err.message);
-      setEmpSyncStatus('error', '✗ Sync failed — check your internet connection');
+      setEmpSyncStatus('error', '✗ Save failed — check that the local server (node server.js) is running');
       empBtn.disabled = false;
       console.error(err);
     }

@@ -1,0 +1,12 @@
+{
+  "name": "attendance-dashboard",
+  "version": "1.0.0",
+  "description": "Biometric Attendance Dashboard — local PC server storage (no cloud account required)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}
