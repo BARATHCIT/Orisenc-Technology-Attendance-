@@ -7,8 +7,8 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 
   <!-- Local PC server connection settings (SERVER_BASE_URL) -->
-  <script src="server-config.js?v=c8568df"></script>
-  <script src="browser-store.js?v=c8568df"></script>
+  <script src="server-config.js?v=loopback2"></script>
+  <script src="browser-store.js?v=loopback2"></script>
 
   <style>
     :root{
@@ -186,7 +186,7 @@
     }
     try {
       const base = (typeof SERVER_BASE_URL !== 'undefined' && SERVER_BASE_URL) ? SERVER_BASE_URL : '';
-      const res = await fetch(base + '/api/attendance/att_face_summary');
+      const res = await fetch(base + '/api/attendance/att_face_summary', pagesToLocalServer ? { targetAddressSpace: 'loopback' } : {});
       if (res.ok) {
         document.getElementById('cachedBanner').classList.add('show');
         document.getElementById('goDash').style.display = 'block';
@@ -505,7 +505,7 @@
       return raw ? JSON.parse(raw) : [];
     }
     try {
-      const res = await fetch(apiBase() + '/api/attendance/' + encodeURIComponent(key));
+      const res = await fetch(apiBase() + '/api/attendance/' + encodeURIComponent(key), pagesToLocalServer ? { targetAddressSpace: 'loopback' } : {});
       if (res.ok) return await res.json();
       if (pagesToLocalServer) throw new Error('Local Node server returned ' + res.status);
     } catch(e) {
@@ -526,6 +526,7 @@
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: json,
+      ...(pagesToLocalServer ? { targetAddressSpace: 'loopback' } : {}),
     });
     if (!res.ok) throw new Error('Local server save failed (' + res.status + ')');
   }
@@ -675,7 +676,7 @@
       return raw ? JSON.parse(raw) : [];
     }
     try {
-      const res = await fetch(apiBase() + '/api/employee-master');
+      const res = await fetch(apiBase() + '/api/employee-master', pagesToLocalServer ? { targetAddressSpace: 'loopback' } : {});
       if (res.ok) return await res.json();
       if (pagesToLocalServer) throw new Error('Local Node server returned ' + res.status);
     } catch(e) {
@@ -730,6 +731,7 @@
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: json,
+      ...(pagesToLocalServer ? { targetAddressSpace: 'loopback' } : {}),
     });
     if (!res.ok) throw new Error('Local server save failed (' + res.status + ')');
   }
