@@ -146,6 +146,8 @@ tbody tr:hover .badge{
 .pager button:hover:not(:disabled){border-color:var(--accent);color:var(--accent);}
 .pager button:disabled{opacity:.4;cursor:not-allowed;}
 .pager input{width:58px;height:30px;padding:0 6px;background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:7px;text-align:center;font:600 12px 'Inter',sans-serif;}
+.show-all-dates{margin-left:8px;padding:0;border:0;background:none;color:var(--accent);font:600 13px 'Inter',sans-serif;cursor:pointer;}
+.show-all-dates[hidden]{display:none;}
 .no-data{text-align:center;padding:56px;color:var(--muted);}
 .no-data small{display:block;font-size:13px;margin-top:6px;}
 
@@ -270,7 +272,7 @@ tbody tr:hover .badge{
     </tbody>
   </table>
   <div class="tfoot-row">
-    <span id="foot-left">—</span>
+    <span><span id="foot-left">—</span><button id="show-all-dates" class="show-all-dates" onclick="showAllDates()" hidden>Show all dates</button></span>
     <span class="pager">
       <button id="prev-page" onclick="changePage(-1)">← Previous</button>
       <label for="page-number">Page</label>
@@ -628,13 +630,17 @@ function render(){
   const total=currentData().length, shown=enriched.length;
   const fmt=n=>n.toLocaleString("en-IN");
 
-document.getElementById("count-pill").textContent=
-shown===total
-?`${fmt(total)} records`
-:`${fmt(shown)} of ${fmt(total)}`;
+  const selectedDay = dateFrom && dateFrom === dateTo ? dateFrom : '';
+  const selectedDayLabel = selectedDay
+    ? new Date(selectedDay + 'T00:00:00').toLocaleDateString('en-IN', {day:'numeric',month:'short',year:'numeric'})
+    : '';
+  document.getElementById("count-pill").textContent = selectedDay
+    ? `${fmt(shown)} on ${selectedDayLabel} · ${fmt(total)} total`
+    : shown===total ? `${fmt(total)} records` : `${fmt(shown)} of ${fmt(total)} records`;
   const rangeStart = shown ? pageStart+1 : 0;
   const rangeEnd = Math.min(pageStart+PAGE_SIZE, shown);
   document.getElementById("foot-left").textContent=`Showing ${rangeStart}–${rangeEnd} of ${shown} record${shown!==1?"s":""}`;
+  document.getElementById("show-all-dates").hidden=!(dateFrom || dateTo || monthSel);
   const pageInput=document.getElementById("page-number");
   pageInput.max=totalPages;
   pageInput.value=currentPage;
@@ -780,6 +786,13 @@ function clearFilters(){
   document.getElementById("teamFilter").value="";
   document.getElementById("monthFilter").value="";
   sortState = { column: 'date', direction: 'desc' };
+  currentPage=1;
+  render();
+}
+function showAllDates(){
+  document.getElementById("dateFrom").value="";
+  document.getElementById("dateTo").value="";
+  document.getElementById("monthFilter").value="";
   currentPage=1;
   render();
 }
