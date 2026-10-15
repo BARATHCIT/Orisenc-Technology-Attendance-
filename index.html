@@ -140,11 +140,12 @@ tbody tr:hover .badge{
 .badge-full{background:rgba(0,201,167,.12);color:var(--green);}.badge-full::before{background:var(--green);}
 .badge-half{background:rgba(255,179,71,.12);color:var(--amber);}.badge-half::before{background:var(--amber);}
 .badge-short{background:rgba(255,101,132,.12);color:var(--accent2);}.badge-short::before{background:var(--accent2);}
-.tfoot-row{padding:10px 16px;background:var(--foot-bg);border-top:1px solid var(--border);font-size:13px;color:var(--muted);display:flex;justify-content:space-between;}
-.pager{display:flex;align-items:center;gap:8px;}
+.tfoot-row{padding:10px 16px;background:var(--foot-bg);border-top:1px solid var(--border);font-size:13px;color:var(--muted);display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;}
+.pager{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
 .pager button{height:30px;padding:0 12px;background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:7px;cursor:pointer;font:600 12px 'Inter',sans-serif;}
 .pager button:hover:not(:disabled){border-color:var(--accent);color:var(--accent);}
 .pager button:disabled{opacity:.4;cursor:not-allowed;}
+.pager input{width:58px;height:30px;padding:0 6px;background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:7px;text-align:center;font:600 12px 'Inter',sans-serif;}
 .no-data{text-align:center;padding:56px;color:var(--muted);}
 .no-data small{display:block;font-size:13px;margin-top:6px;}
 
@@ -272,7 +273,9 @@ tbody tr:hover .badge{
     <span id="foot-left">—</span>
     <span class="pager">
       <button id="prev-page" onclick="changePage(-1)">← Previous</button>
-      <span id="page-info">—</span>
+      <label for="page-number">Page</label>
+      <input id="page-number" type="number" min="1" step="1" value="1" aria-label="Page number" onchange="goToPage(this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();goToPage(this.value);this.blur()}">
+      <span id="page-total">of 1</span>
       <button id="next-page" onclick="changePage(1)">Next →</button>
     </span>
   </div>
@@ -529,9 +532,16 @@ function resetPageAndRender(){
   render();
 }
 function changePage(delta){
-  currentPage+=delta;
+  goToPage(currentPage+delta);
+}
+function goToPage(value){
+  const requestedPage = Number(value);
+  if(!Number.isInteger(requestedPage) || requestedPage < 1){
+    document.getElementById('page-number').value=currentPage;
+    return;
+  }
+  currentPage=requestedPage;
   render();
-  document.querySelector('.table-wrap')?.scrollIntoView({behavior:'smooth',block:'start'});
 }
 function updateSortIndicators(){
   ['employee','date','hours','punches'].forEach(col=>{
@@ -615,7 +625,10 @@ shown===total
   const rangeStart = shown ? pageStart+1 : 0;
   const rangeEnd = Math.min(pageStart+PAGE_SIZE, shown);
   document.getElementById("foot-left").textContent=`Showing ${rangeStart}–${rangeEnd} of ${shown} record${shown!==1?"s":""}`;
-  document.getElementById("page-info").textContent=`Page ${currentPage} of ${totalPages}`;
+  const pageInput=document.getElementById("page-number");
+  pageInput.max=totalPages;
+  pageInput.value=currentPage;
+  document.getElementById("page-total").textContent=`of ${totalPages}`;
   document.getElementById("prev-page").disabled=currentPage<=1;
   document.getElementById("next-page").disabled=currentPage>=totalPages;
 
