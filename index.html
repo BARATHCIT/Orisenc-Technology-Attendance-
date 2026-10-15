@@ -233,13 +233,13 @@ tbody tr:hover .badge{
 <div class="controls">
   <input type="text"  id="search"   placeholder="🔍 Name or Employee ID…" oninput="resetPageAndRender()">
   <div class="sep"></div>
-  <label>From</label><input type="date" id="dateFrom" onchange="resetPageAndRender()">
-  <label>To</label>  <input type="date" id="dateTo"   onchange="resetPageAndRender()">
+  <label>From</label><input type="date" id="dateFrom" onchange="onDateChange('from')">
+  <label>To</label>  <input type="date" id="dateTo"   onchange="onDateChange('to')">
   <div class="sep"></div>
   <select id="teamFilter" onchange="resetPageAndRender()">
     <option value="">All Teams</option>
   </select>
-  <select id="monthFilter" onchange="resetPageAndRender()">
+  <select id="monthFilter" onchange="onMonthChange()">
     <option value="">All Months</option>
   </select>
   <div class="sep"></div>
@@ -347,6 +347,8 @@ let panelContext = null; // {name, date, uid}
 let renderSequence = 0;
 let currentPage = 1;
 const PAGE_SIZE = 100;
+let singleDateMode = true;
+let singleDateField = null;
 
 /* ── Sort state (replaces old Sort dropdown) ──
    column: 'employee' | 'date' | 'hours' | 'punches'
@@ -543,6 +545,25 @@ function resetPageAndRender(){
   currentPage=1;
   render();
 }
+function onDateChange(field){
+  if(singleDateMode){
+    if(singleDateField && singleDateField !== field){
+      singleDateMode = false;
+    } else {
+      const changed = document.getElementById(field === 'from' ? 'dateFrom' : 'dateTo');
+      document.getElementById(field === 'from' ? 'dateTo' : 'dateFrom').value = changed.value;
+      singleDateField = field;
+    }
+  }
+  resetPageAndRender();
+}
+function onMonthChange(){
+  document.getElementById('dateFrom').value = '';
+  document.getElementById('dateTo').value = '';
+  singleDateMode = false;
+  singleDateField = null;
+  resetPageAndRender();
+}
 function changePage(delta){
   goToPage(currentPage+delta);
 }
@@ -650,7 +671,7 @@ function render(){
 
   const tbody=document.getElementById("tbody");
   if(!enriched.length){
-    tbody.innerHTML=`<tr><td colspan="11"><div class="no-data">No records match your filters<small>Try adjusting the date range or search term</small></div></td></tr>`;
+    tbody.innerHTML=`<tr><td colspan="11"><div class="no-data">${selectedDay ? `No attendance records for ${selectedDayLabel}` : 'No records match your filters'}<small>${selectedDay ? 'Choose another date or Show all dates' : 'Try adjusting the date range or search term'}</small></div></td></tr>`;
     return;
   }
 
@@ -785,6 +806,8 @@ function clearFilters(){
   document.getElementById("dateTo").value="";
   document.getElementById("teamFilter").value="";
   document.getElementById("monthFilter").value="";
+  singleDateMode=false;
+  singleDateField=null;
   sortState = { column: 'date', direction: 'desc' };
   currentPage=1;
   render();
@@ -793,6 +816,8 @@ function showAllDates(){
   document.getElementById("dateFrom").value="";
   document.getElementById("dateTo").value="";
   document.getElementById("monthFilter").value="";
+  singleDateMode=false;
+  singleDateField=null;
   currentPage=1;
   render();
 }
