@@ -49,6 +49,22 @@
     return `${h12}:${m} ${period}`;
   }
 
+  function escapeHtml(value) {
+    return String(value).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+  }
+
+  function getPunchType(punch, index, total) {
+    const sourceType = String(punch['In/Out'] || '').trim();
+    const direction = sourceType.toLowerCase();
+    if (direction === 'in') return { label: '🟢 In', cls: 'punch-in' };
+    if (direction === 'out') return { label: '🔴 Out', cls: 'punch-out' };
+    if (sourceType) return { label: `⚪ ${sourceType}`, cls: '' };
+    // Older imports and Great HR have no source direction; mark time-based labels.
+    if (index === 0) return { label: '🟢 In (time)', cls: 'punch-in' };
+    if (index === total - 1 && total > 1) return { label: '🔴 Out (time)', cls: 'punch-out' };
+    return { label: '—', cls: '' };
+  }
+
   // Punch records carry the Employee ID under different field names
   // depending on source (face/fingerprint use "User ID", Great HR uses
   // "Employee No"). This is confirmed reliable even when the Name spelling
@@ -408,6 +424,8 @@
     getPunchId,
     normalizeId,
     formatTime12h,
+    escapeHtml,
+    getPunchType,
     getCrossModeTimes,
     getCrossModeTimesForNames,
     getCrossModeTimesForId,

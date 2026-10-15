@@ -78,8 +78,8 @@ def build_summary(src, id_col):
 def build_punches(src, id_col, mode_label, device_col=None):
     rows = []
     for (name, uid, date), grp in src.groupby(["Name", id_col, "Date"], sort=False):
-        times = sorted(grp["Punch Time"].tolist())
-        for i, t in enumerate(times):
+        for i, (_, source) in enumerate(grp.sort_values("Punch Time").iterrows()):
+            t = source["Punch Time"]
             row = {
                 "Name":  name,
                 id_col:  str(uid),
@@ -88,13 +88,14 @@ def build_punches(src, id_col, mode_label, device_col=None):
                 "Seq":   i + 1,
                 "Mode":  mode_label,
                 "Device": "Great HR" if mode_label == "greathr" else "",
+                "In/Out": "",
             }
             if device_col and device_col in grp.columns:
-                # pick the device value for this specific punch row by timestamp
-                match = grp[grp["Punch Time"] == t]
-                if not match.empty:
-                    raw = str(match.iloc[0][device_col]).strip()
-                    row["Device"] = "" if raw in ("nan", "NaT", "NaN", "") else raw
+                raw = str(source[device_col]).strip()
+                row["Device"] = "" if raw in ("nan", "NaT", "NaN", "") else raw
+            if mode_label != "greathr" and "I/O Type" in grp.columns:
+                raw = str(source["I/O Type"]).strip()
+                row["In/Out"] = "" if raw in ("nan", "NaT", "NaN", "") else raw
             rows.append(row)
     return rows
 

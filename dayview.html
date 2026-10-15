@@ -264,7 +264,7 @@ tbody td:first-child{text-align:center;color:var(--muted);font-size:13px;}
       <div class="panel-table-wrap">
         <table class="panel-table">
           <thead>
-            <tr><th>#</th><th>Time</th><th>Punch</th><th>Mode</th><th>Device</th></tr>
+            <tr><th>#</th><th>Time</th><th>I/O Type</th><th>Mode</th><th>Device</th></tr>
           </thead>
           <tbody id="punch-tbody"></tbody>
         </table>
@@ -684,16 +684,13 @@ function renderPunchTable(){
   const tbody=document.getElementById("punch-tbody");
 
   if(!rows.length){
-    tbody.innerHTML=`<tr><td colspan="4" style="text-align:center;padding:24px;color:var(--muted)">No punch events found for this date</td></tr>`;
+    tbody.innerHTML=`<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted)">No punch events found for this date</td></tr>`;
     return;
   }
 
   const total=rows.length;
   tbody.innerHTML=rows.map((p,j)=>{
-    const isIn =j===0;
-    const isOut=j===total-1&&total>1;
-    const label=isIn?"🟢 In":isOut?"🔴 Out":`⚪ #${j+1}`;
-    const tc   =isIn?"punch-in":isOut?"punch-out":"";
+    const {label, cls:tc}=window.AttData.getPunchType(p,j,total);
     const mp   =p.Mode==="face"
       ?`<span class="mode-pill mode-face">👤 Face</span>`
       :p.Mode==="fingerprint"
@@ -702,9 +699,9 @@ function renderPunchTable(){
     return`<tr>
       <td style="color:var(--muted);font-size:12px;text-align:center">${j+1}</td>
       <td class="${tc}" style="font-size:16px;font-weight:700;letter-spacing:.03em">${window.AttData.formatTime12h(p.Time)}</td>
-      <td style="font-size:13px">${label}</td>
+      <td style="font-size:13px">${window.AttData.escapeHtml(label)}</td>
       <td>${mp}</td>
-      <td style="font-size:13px;color:var(--muted)">${p.Device||"—"}</td>
+      <td style="font-size:13px;color:var(--muted)">${window.AttData.escapeHtml(p.Device||"—")}</td>
     </tr>`;
   }).join("");
 }

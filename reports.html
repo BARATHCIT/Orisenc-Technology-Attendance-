@@ -1560,9 +1560,7 @@ function openPanel(name, date, uid) {
     tbody.innerHTML=`<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted)">No punch events found</td></tr>`;
   } else {
     tbody.innerHTML = rows.map((p,j)=>{
-      const isIn=j===0, isOut=j===total-1&&total>1;
-      const label=isIn?"🟢 In":isOut?"🔴 Out":`⚪ #${j+1}`;
-      const tc=isIn?"punch-in":isOut?"punch-out":"";
+      const {label, cls:tc}=window.AttData.getPunchType(p,j,total);
       const mp=p.Mode==="face"
         ?`<span class="mode-pill mode-face">👤 Face</span>`
         :p.Mode==="fingerprint"
@@ -1571,9 +1569,9 @@ function openPanel(name, date, uid) {
       return`<tr>
         <td style="color:var(--muted);font-size:12px;text-align:center">${j+1}</td>
         <td class="${tc}" style="font-size:16px;font-weight:700;letter-spacing:.03em">${window.AttData.formatTime12h(p.Time)}</td>
-        <td style="font-size:13px">${label}</td>
+        <td style="font-size:13px">${window.AttData.escapeHtml(label)}</td>
         <td>${mp}</td>
-        <td style="font-size:13px;color:var(--muted)">${p.Device||"—"}</td>
+        <td style="font-size:13px;color:var(--muted)">${window.AttData.escapeHtml(p.Device||"—")}</td>
       </tr>`;
     }).join("");
   }
@@ -1664,7 +1662,7 @@ function clearAll(){
       <div class="panel-section-title">Punch Events for This Day</div>
       <div class="panel-table-wrap">
         <table class="panel-table">
-          <thead><tr><th>#</th><th>Time</th><th>Punch</th><th>Mode</th><th>Device</th></tr></thead>
+          <thead><tr><th>#</th><th>Time</th><th>I/O Type</th><th>Mode</th><th>Device</th></tr></thead>
           <tbody id="punch-tbody"></tbody>
         </table>
         <div class="panel-foot" id="punch-foot">—</div>

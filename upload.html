@@ -252,6 +252,7 @@
     headers.forEach((h, i) => { COL[h] = i; });
     const iUserID = COL['User ID'], iName = COL['Name'], iPunch = COL['Punch Time'];
     const iDevice = COL['Device/Source Detail'], iMode = COL['Punch Mode'];
+    const iInOut = COL['I/O Type'] ?? COL['In/Out'];
     if (iUserID === undefined || iName === undefined || iPunch === undefined)
       throw new Error(`Missing required columns. Found: ${headers.filter(Boolean).join(', ')}`);
 
@@ -317,6 +318,7 @@
         'User ID': userIDStr, 'Name': nameStr, 'Date': rowDate,
         'Punch Time': punchTimeStr,
         'Device/Source Detail': String(row[iDevice]||'').trim(),
+        'I/O Type': iInOut === undefined ? '' : String(row[iInOut]||'').trim(),
         'Punch Mode': modeRaw
       });
     }
@@ -424,7 +426,8 @@
           const raw = String(e[deviceCol]||'').trim();
           device = ['nan','NaT','NaN',''].includes(raw) ? '' : raw;
         }
-        const row = { 'Name': g.name, 'Date': g.date, 'Time': e['Punch Time'], 'Seq': i+1, 'Mode': modeLabel, 'Device': device };
+        const row = { 'Name': g.name, 'Date': g.date, 'Time': e['Punch Time'], 'Seq': i+1, 'Mode': modeLabel, 'Device': device,
+          'In/Out': modeLabel === 'greathr' ? '' : e['I/O Type'] || '' };
         row[idCol] = g.uid;
         rows.push(row);
       });
@@ -441,9 +444,20 @@
   }
 
   function mergePunches(existing, incoming) {
-    const seen = new Set(existing.map(r => `${r.Name}||${r.Date}||${r.Time}||${r.Mode}`));
-    const toAdd = incoming.filter(r => !seen.has(`${r.Name}||${r.Date}||${r.Time}||${r.Mode}`));
-    return [...existing, ...toAdd];
+    const merged = existing.map(r => ({...r}));
+    const key = r => `${r.Name}||${r.Date}||${r.Time}||${r.Mode}`;
+    const byKey = new Map(merged.map((r, i) => [key(r), i]));
+    incoming.forEach(r => {
+      const match = byKey.get(key(r));
+      if (match === undefined) {
+        byKey.set(key(r), merged.length);
+        merged.push(r);
+      } else if (r['In/Out']) {
+        // Re-imports fill the direction on punches saved before this field existed.
+        merged[match]['In/Out'] = r['In/Out'];
+      }
+    });
+    return merged;
   }
 
   // ── Six-month attendance retention ───────────────────────────────────────
