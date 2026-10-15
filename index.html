@@ -378,9 +378,16 @@ function populateMonthFilter(){
   });
   const months = Array.from(monthSet).sort();
   sel.innerHTML = `<option value="">All Months</option>` + months.map(ym=>`<option value="${ym}">${formatMonthLabel(ym)}</option>`).join("");
-  // Open on the newest month that has attendance; "All Months" remains available.
-  if(prevVal && months.includes(prevVal)) sel.value = prevVal;
-  else if(months.length) sel.value = months[months.length-1];
+  if(months.includes(prevVal)) sel.value = prevVal;
+}
+function selectLatestAttendanceDate(){
+  const latestDate = allData.reduce((latest, row) => {
+    const date = String(row.Date || '').slice(0, 10);
+    return /^\d{4}-\d{2}-\d{2}$/.test(date) && date > latest ? date : latest;
+  }, '');
+  if(!latestDate) return;
+  document.getElementById('dateFrom').value = latestDate;
+  document.getElementById('dateTo').value = latestDate;
 }
 
 /* Build once after loading instead of scanning every punch for every table row.
@@ -420,6 +427,7 @@ Promise.all([
   buildPunchIndex();
   populateTeamFilter();
   populateMonthFilter();
+  selectLatestAttendanceDate();
   const time = new Date().toLocaleTimeString("en-IN",{
     hour:"2-digit",
     minute:"2-digit"
