@@ -91,7 +91,7 @@
       const path = store === 'employeeMaster'
         ? '/api/employee-master'
         : '/api/attendance/' + encodeURIComponent(key);
-      const res = await _fetch(apiBase() + path);
+      const res = await _fetch(apiBase() + path, { cache: 'no-store' });
       if (!res.ok) return null;
       const data = await res.json();
       try { localStorage.setItem(cacheKey(store, key), JSON.stringify(data)); } catch(e){}

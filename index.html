@@ -378,7 +378,9 @@ function populateMonthFilter(){
   });
   const months = Array.from(monthSet).sort();
   sel.innerHTML = `<option value="">All Months</option>` + months.map(ym=>`<option value="${ym}">${formatMonthLabel(ym)}</option>`).join("");
-  if(months.includes(prevVal)) sel.value = prevVal;
+  // Open on the newest month that has attendance; "All Months" remains available.
+  if(prevVal && months.includes(prevVal)) sel.value = prevVal;
+  else if(months.length) sel.value = months[months.length-1];
 }
 
 /* Build once after loading instead of scanning every punch for every table row.
