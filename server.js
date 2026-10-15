@@ -64,6 +64,19 @@ function writeJsonFile(filePath, data) {
 
 app.use(express.json({ limit: '100mb' }));
 
+// Allow the GitHub Pages app on this PC to call its local Node server.
+// Browsers also preflight requests from a public HTTPS page to localhost.
+app.use((req, res, next) => {
+  if (req.headers.origin !== 'https://barathcit.github.io') return next();
+  res.setHeader('Access-Control-Allow-Origin', req.headers.origin);
+  res.setHeader('Vary', 'Origin');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Private-Network', 'true');
+  if (req.method === 'OPTIONS') return res.sendStatus(204);
+  next();
+});
+
 // ── Attendance data (face / fingerprint / Great HR summaries + punch details) ──
 app.get('/api/attendance/:key', (req, res) => {
   const { key } = req.params;

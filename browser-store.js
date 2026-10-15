@@ -1,6 +1,6 @@
-// GitHub Pages has no write API. Keep its imports in this browser's IndexedDB.
+// Optional browser-only storage, used when a static deployment has no server URL.
 (function () {
-  const browserOnly = location.hostname.endsWith('.github.io');
+  const browserOnly = location.hostname.endsWith('.github.io') && !SERVER_BASE_URL;
   function open() {
     return new Promise((resolve, reject) => {
       const request = indexedDB.open('orisenc-attendance', 1);

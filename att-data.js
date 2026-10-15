@@ -97,6 +97,7 @@
   }
 
   const browserOnly = window.BrowserStore && window.BrowserStore.browserOnly;
+  const pagesToLocalServer = location.hostname.endsWith('.github.io') && !browserOnly;
 
   // localStorage cache key is namespaced by store so employee master and
   // attendance data never collide even if a filename were reused.
@@ -111,13 +112,13 @@
         ? '/api/employee-master'
         : '/api/attendance/' + encodeURIComponent(key);
       const res = await _fetch(apiBase() + path, { cache: 'no-store' });
-      if (!res.ok) return null;
+      if (!res.ok) return pagesToLocalServer ? [] : null;
       const data = await res.json();
       try { localStorage.setItem(cacheKey(store, key), JSON.stringify(data)); } catch(e){}
       return data;
     } catch (e) {
-      console.warn('Local server read failed, falling back to localStorage:', e.message);
-      return null;
+      console.warn('Local server read failed:', e.message);
+      return pagesToLocalServer ? [] : null;
     }
   }
 

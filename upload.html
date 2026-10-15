@@ -163,6 +163,11 @@
   const empInput   = document.getElementById('empFile');
   const empBtn     = document.getElementById('empBtn');
   const browserOnly = window.BrowserStore.browserOnly;
+  const pagesToLocalServer = location.hostname.endsWith('.github.io') && !browserOnly;
+  if (pagesToLocalServer) {
+    document.getElementById('storageSubtitle').textContent = 'Imports are saved to the Node server on this PC. Keep node server.js running while using this GitHub link.';
+    document.getElementById('cachedText').textContent = 'Attendance data is available on the Node server on this PC.';
+  }
   if (browserOnly) {
     document.getElementById('storageSubtitle').textContent = 'Imports on this GitHub link are saved only in this browser on this device. Other users will not see them.';
     document.getElementById('cachedText').textContent = 'Saved data is available in this browser. Upload new files to update it.';
@@ -190,6 +195,7 @@
     } catch (e) {
       // Local server unreachable — fall through to localStorage check
     }
+    if (pagesToLocalServer) return;
     if (localStorage.getItem('att_face_summary')) {
       document.getElementById('cachedBanner').classList.add('show');
       document.getElementById('goDash').style.display = 'block';
@@ -501,7 +507,10 @@
     try {
       const res = await fetch(apiBase() + '/api/attendance/' + encodeURIComponent(key));
       if (res.ok) return await res.json();
-    } catch(e) {}
+      if (pagesToLocalServer) throw new Error('Local Node server returned ' + res.status);
+    } catch(e) {
+      if (pagesToLocalServer) throw new Error('Cannot reach the Node server on this PC at http://localhost:5000. Start node server.js and try again.');
+    }
     // Fall back to localStorage if the server isn't reachable
     const raw = localStorage.getItem(key);
     return raw ? JSON.parse(raw) : [];
@@ -511,7 +520,7 @@
   async function saveToCloud(key, data) {
     if (browserOnly) return window.BrowserStore.put(key, data);
     const json = JSON.stringify(data);
-    try { localStorage.setItem(key, json); } catch(e) {}
+    if (!pagesToLocalServer) try { localStorage.setItem(key, json); } catch(e) {}
 
     const res = await fetch(apiBase() + '/api/attendance/' + encodeURIComponent(key), {
       method: 'POST',
@@ -668,7 +677,10 @@
     try {
       const res = await fetch(apiBase() + '/api/employee-master');
       if (res.ok) return await res.json();
-    } catch(e) {}
+      if (pagesToLocalServer) throw new Error('Local Node server returned ' + res.status);
+    } catch(e) {
+      if (pagesToLocalServer) throw new Error('Cannot reach the Node server on this PC at http://localhost:5000. Start node server.js and try again.');
+    }
     const raw = localStorage.getItem('emp_master');
     return raw ? JSON.parse(raw) : [];
   }
@@ -712,7 +724,7 @@
   async function saveEmployeeMaster(data) {
     if (browserOnly) return window.BrowserStore.put('emp_master', data);
     const json = JSON.stringify(data);
-    try { localStorage.setItem('emp_master', json); } catch(e) {}
+    if (!pagesToLocalServer) try { localStorage.setItem('emp_master', json); } catch(e) {}
 
     const res = await fetch(apiBase() + '/api/employee-master', {
       method: 'POST',
