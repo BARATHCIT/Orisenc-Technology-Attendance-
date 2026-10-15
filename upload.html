@@ -8,6 +8,7 @@
 
   <!-- Local PC server connection settings (SERVER_BASE_URL) -->
   <script src="server-config.js"></script>
+  <script src="browser-store.js"></script>
 
   <style>
     :root{
@@ -72,12 +73,12 @@
 <body>
   <div class="logo">Attendance System</div>
   <h1>Import Centre</h1>
-  <p class="subtitle">Upload Biometric and GreatHR files to sync attendance across all users.</p>
+  <p class="subtitle" id="storageSubtitle">Upload Biometric and GreatHR files to sync attendance across all users.</p>
 
   <div class="card">
     <div class="cached-banner" id="cachedBanner">
       <span>✓</span>
-      <span><strong>Cloud data is up to date.</strong> Upload new files to sync the latest attendance.</span>
+      <span id="cachedText"><strong>Saved attendance data is available.</strong> Upload new files to update it.</span>
     </div>
     <a href="index.html" class="go-dashboard" id="goDash" style="display:none">→ Open Dashboard</a>
 
@@ -117,7 +118,7 @@
         <div class="step" id="step5"><div class="step-dot"></div>Building punch details</div>
         <div class="step" id="step6"><div class="step-dot"></div>Merging with existing data</div>
         <div class="step" id="step7"><div class="step-dot"></div>Removing records older than 6 months</div>
-        <div class="step" id="step8"><div class="step-dot"></div>Saving to local server</div>
+        <div class="step" id="step8"><div class="step-dot"></div><span id="saveStepText">Saving to local server</span></div>
       </div>
     </div>
 
@@ -161,9 +162,23 @@
   const processBtn = document.getElementById('processBtn');
   const empInput   = document.getElementById('empFile');
   const empBtn     = document.getElementById('empBtn');
+  const browserOnly = window.BrowserStore.browserOnly;
+  if (browserOnly) {
+    document.getElementById('storageSubtitle').textContent = 'Imports on this GitHub link are saved only in this browser on this device. Other users will not see them.';
+    document.getElementById('cachedText').textContent = 'Saved data is available in this browser. Upload new files to update it.';
+    document.getElementById('saveStepText').textContent = 'Saving in this browser';
+  }
 
   // Check if local server (or localStorage fallback) already has synced data
   (async () => {
+    if (browserOnly) {
+      const saved = await window.BrowserStore.get('att_face_summary');
+      if (saved !== null || localStorage.getItem('att_face_summary')) {
+        document.getElementById('cachedBanner').classList.add('show');
+        document.getElementById('goDash').style.display = 'block';
+      }
+      return;
+    }
     try {
       const base = (typeof SERVER_BASE_URL !== 'undefined' && SERVER_BASE_URL) ? SERVER_BASE_URL : '';
       const res = await fetch(base + '/api/attendance/att_face_summary');
@@ -477,6 +492,12 @@
     return (typeof SERVER_BASE_URL !== 'undefined' && SERVER_BASE_URL) ? SERVER_BASE_URL : '';
   }
   async function readExisting(key) {
+    if (browserOnly) {
+      const saved = await window.BrowserStore.get(key);
+      if (saved !== null) return saved;
+      const raw = localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : [];
+    }
     try {
       const res = await fetch(apiBase() + '/api/attendance/' + encodeURIComponent(key));
       if (res.ok) return await res.json();
@@ -488,6 +509,7 @@
 
   // ── Write to the local PC server (+ localStorage cache) ───────────────────
   async function saveToCloud(key, data) {
+    if (browserOnly) return window.BrowserStore.put(key, data);
     const json = JSON.stringify(data);
     try { localStorage.setItem(key, json); } catch(e) {}
 
@@ -553,8 +575,8 @@
       mergedGHR     = applyRetention(mergedGHR,     cutoff);
       mergedPunches = applyRetention(mergedPunches, cutoff);
 
-      setStep(7,'done'); setStep(8,'active'); setProgress(85,'Saving to local server…');
-      setSyncStatus('syncing', '💾 Saving to local server — please wait…');
+      setStep(7,'done'); setStep(8,'active'); setProgress(85,browserOnly ? 'Saving in this browser…' : 'Saving to local server…');
+      setSyncStatus('syncing', browserOnly ? '💾 Saving in this browser — please wait…' : '💾 Saving to local server — please wait…');
       await tick();
 
       await Promise.all([
@@ -565,7 +587,7 @@
       ]);
 
       setStep(8,'done'); setProgress(100,'Done!');
-      setSyncStatus('synced', `✓ Saved to local server — all devices on this network will see updated data`);
+      setSyncStatus('synced', browserOnly ? '✓ Saved in this browser on this device' : '✓ Saved to local server — all devices on this network will see updated data');
 
       console.log(`✅ Face        : ${faceSummary.length} new → ${mergedFace.length} total (after 6-month retention)`);
       console.log(`✅ Fingerprint : ${fpSummary.length} new → ${mergedFP.length} total (after 6-month retention)`);
@@ -578,7 +600,7 @@
     } catch (err) {
       setProgress(0,'Error');
       showError('Error: ' + err.message);
-      setSyncStatus('error', '✗ Save failed — check that the local server (node server.js) is running');
+      setSyncStatus('error', browserOnly ? '✗ Browser save failed — check browser storage settings and free space' : '✗ Save failed — check that the local server (node server.js) is running');
       processBtn.disabled = false;
       console.error(err);
     }
@@ -637,6 +659,12 @@
 
   // ── Employee Master read/merge/save (separate store — never overwritten wholesale) ──
   async function readEmployeeMaster() {
+    if (browserOnly) {
+      const saved = await window.BrowserStore.get('emp_master');
+      if (saved !== null) return saved;
+      const raw = localStorage.getItem('emp_master');
+      return raw ? JSON.parse(raw) : [];
+    }
     try {
       const res = await fetch(apiBase() + '/api/employee-master');
       if (res.ok) return await res.json();
@@ -682,6 +710,7 @@
   }
 
   async function saveEmployeeMaster(data) {
+    if (browserOnly) return window.BrowserStore.put('emp_master', data);
     const json = JSON.stringify(data);
     try { localStorage.setItem('emp_master', json); } catch(e) {}
 
@@ -715,19 +744,19 @@
       await tick();
       const merged = mergeEmployeeMaster(existing, incoming);
 
-      setEmpProgress(85, 'Saving to local server…');
+      setEmpProgress(85, browserOnly ? 'Saving in this browser…' : 'Saving to local server…');
       setEmpSyncStatus('syncing', '💾 Saving Employee Master — please wait…');
       await tick();
       await saveEmployeeMaster(merged);
 
       setEmpProgress(100, 'Done!');
-      setEmpSyncStatus('synced', `✓ Employee Master synced — ${merged.length} employees total`);
+      setEmpSyncStatus('synced', browserOnly ? `✓ Employee Master saved in this browser — ${merged.length} employees total` : `✓ Employee Master synced — ${merged.length} employees total`);
       console.log(`✅ Employee Master: ${incoming.length} in upload → ${merged.length} total after merge`);
 
     } catch (err) {
       setEmpProgress(0, 'Error');
       showEmpError('Error: ' + err.message);
-      setEmpSyncStatus('error', '✗ Save failed — check that the local server (node server.js) is running');
+      setEmpSyncStatus('error', browserOnly ? '✗ Browser save failed — check browser storage settings and free space' : '✗ Save failed — check that the local server (node server.js) is running');
       empBtn.disabled = false;
       console.error(err);
     }

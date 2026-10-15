@@ -96,6 +96,8 @@
     return (typeof SERVER_BASE_URL !== 'undefined' && SERVER_BASE_URL) ? SERVER_BASE_URL : '';
   }
 
+  const browserOnly = window.BrowserStore && window.BrowserStore.browserOnly;
+
   // localStorage cache key is namespaced by store so employee master and
   // attendance data never collide even if a filename were reused.
   function cacheKey(store, key) {
@@ -103,6 +105,7 @@
   }
 
   async function readFromServer(store, key) {
+    if (browserOnly) return null;
     try {
       const path = store === 'employeeMaster'
         ? '/api/employee-master'
@@ -118,7 +121,11 @@
     }
   }
 
-  function readFromLocalStorage(store, key) {
+  async function readFromLocalStorage(store, key) {
+    if (browserOnly) {
+      const saved = await window.BrowserStore.get(cacheKey(store, key));
+      if (saved !== null) return saved;
+    }
     const raw = localStorage.getItem(cacheKey(store, key));
     return raw ? JSON.parse(raw) : [];
   }
@@ -132,8 +139,8 @@
     if (!entry) return _fetch(url, opts);
 
     // Try the local server first, fall back to localStorage
-    return readFromServer(entry.store, entry.key).then(data => {
-      const result = data || readFromLocalStorage(entry.store, entry.key);
+    return readFromServer(entry.store, entry.key).then(async data => {
+      const result = data || await readFromLocalStorage(entry.store, entry.key);
       return {
         ok:   true,
         json: () => Promise.resolve(result),
@@ -151,7 +158,7 @@
 
   async function getEmployeeMaster() {
     const data = await readFromServer('employeeMaster', 'master');
-    return data || readFromLocalStorage('employeeMaster', 'master');
+    return data || await readFromLocalStorage('employeeMaster', 'master');
   }
 
   function buildLookupFromMaster(master) {
