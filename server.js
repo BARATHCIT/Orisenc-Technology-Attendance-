@@ -23,7 +23,7 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-const DATA_DIR = path.join(__dirname, 'data');
+const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
 const ATTENDANCE_DIR = path.join(DATA_DIR, 'attendance');
 const EMPLOYEE_MASTER_FILE = path.join(DATA_DIR, 'employee_master.json');
 
@@ -111,6 +111,8 @@ app.post('/api/employee-master', (req, res) => {
 });
 
 // ── Static dashboard files (index.html, employee.html, etc.) ────────────────
+// Keep local records, backups, and installed packages out of the public site.
+app.use(['/data', '/backups', '/node_modules'], (_req, res) => res.sendStatus(404));
 app.use(express.static(__dirname));
 
 app.listen(PORT, () => {
