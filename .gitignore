@@ -1,3 +1,5 @@
 node_modules/
 # Employee master and punch records: personal data, kept local only
 data/
+# Local data backup archives
+backups/
