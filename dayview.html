@@ -390,7 +390,9 @@ async function loadDay(){
   const absentCount   = dayAttendance.employees.filter(e=>e.status==="absent").length;
 
   const teamOptions = window.AttData ? window.AttData.listTeams(teamLookup) : [];
-  const teamOptionsHtml = `<option value="">All Teams</option>` + teamOptions.map(t=>`<option value="${t}">${t}</option>`).join("");
+  const teamOptionsHtml = teamOptions.length
+    ? `<option value="">All Teams</option>` + teamOptions.map(t=>`<option value="${t}">${t}</option>`).join("")
+    : `<option value="">Upload Employee Master for teams</option>`;
 
   document.getElementById("content").innerHTML=`
     <div class="summary-cards">
@@ -416,7 +418,7 @@ async function loadDay(){
     </div>
     <div class="day-controls">
       <input type="text" id="day-search" placeholder="🔍 Name or Employee ID…" oninput="renderDayTable()">
-      <select id="day-team-filter" onchange="renderDayTable()">${teamOptionsHtml}</select>
+      <select id="day-team-filter" onchange="renderDayTable()" ${teamOptions.length ? '' : 'disabled'}>${teamOptionsHtml}</select>
       <span class="day-count" id="day-count">—</span>
       <button class="btn-back" onclick="exportDayExcel()" style="margin-left:8px">⬇ Excel</button>
       <button class="btn-back" onclick="printDayView()">🖨 Print</button>

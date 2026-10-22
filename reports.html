@@ -563,7 +563,10 @@ Promise.all([
   faceData=f;fpData=fp;ghrData=g;punchData=pd;employeeMaster=em;teamLookup=tl;
   const sel=document.getElementById("teamFilterReports");
   const teams=window.AttData?window.AttData.listTeams(teamLookup):[];
-  sel.innerHTML=`<option value="">All Teams</option>`+teams.map(t=>`<option value="${t}">${t}</option>`).join("");
+  sel.innerHTML=teams.length
+    ? `<option value="">All Teams</option>`+teams.map(t=>`<option value="${t}">${t}</option>`).join("")
+    : `<option value="">Upload Employee Master for teams</option>`;
+  sel.disabled=!teams.length;
   populateMonthFilterReports();
 }).catch(()=>document.getElementById("idleHint").innerHTML="⚠ Could not load JSON files. Run python attendance.py first.");
 

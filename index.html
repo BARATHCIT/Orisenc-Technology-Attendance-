@@ -359,7 +359,10 @@ let sortState = { column: 'date', direction: 'desc' };
 function populateTeamFilter(){
   const sel = document.getElementById("teamFilter");
   const teams = window.AttData ? window.AttData.listTeams(teamLookup) : [];
-  sel.innerHTML = `<option value="">All Teams</option>` + teams.map(t=>`<option value="${t}">${t}</option>`).join("");
+  sel.innerHTML = teams.length
+    ? `<option value="">All Teams</option>` + teams.map(t=>`<option value="${t}">${t}</option>`).join("")
+    : `<option value="">Upload Employee Master for teams</option>`;
+  sel.disabled = !teams.length;
 }
 
 /* ── Month filter population ──
