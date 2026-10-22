@@ -6,10 +6,6 @@
   <title>Import Centre — Attendance</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 
-  <!-- Local PC server connection settings (SERVER_BASE_URL) -->
-  <script src="server-config.js?v=loopback2"></script>
-  <script src="browser-store.js?v=loopback2"></script>
-
   <style>
     :root{
     --bg:#f3f4f8;
@@ -68,19 +64,18 @@
     .sync-status.syncing{display:block;background:rgba(108,99,255,.1);border:1px solid rgba(108,99,255,.3);color:var(--accent);}
     .sync-status.synced{display:block;background:rgba(78,204,163,.1);border:1px solid rgba(78,204,163,.3);color:var(--success);}
     .sync-status.error{display:block;background:rgba(255,92,108,.1);border:1px solid rgba(255,92,108,.3);color:var(--danger);}
+    #reportFrame{display:none;width:100%;height:100vh;border:0;}
   </style>
 </head>
 <body>
+  <div id="uploadApp">
   <div class="logo">Attendance System</div>
-  <h1>Import Centre</h1>
-  <p class="subtitle" id="storageSubtitle">Upload Biometric and GreatHR files to sync attendance across all users.</p>
+  <h1>Attendance Analysis</h1>
+  <p class="subtitle">Choose attendance files to analyse. Records stay only in this open tab and disappear when you close or reload it.</p>
 
   <div class="card">
-    <div class="cached-banner" id="cachedBanner">
-      <span>✓</span>
-      <span id="cachedText"><strong>Saved attendance data is available.</strong> Upload new files to update it.</span>
-    </div>
-    <a href="index.html" class="go-dashboard" id="goDash" style="display:none">→ Open Dashboard</a>
+    <div class="cached-banner" id="cachedBanner"><span>✓</span><span>Attendance data is ready for analysis in this tab.</span></div>
+    <button class="btn btn-secondary" id="goDash" style="display:none;margin-bottom:18px" onclick="showDashboard()">Open Dashboard</button>
 
     <div class="upload-zone" id="bioZone">
       <input type="file" id="bioFile" accept=".xlsx,.xls">
@@ -101,7 +96,7 @@
     <div class="divider"></div>
 
     <button class="btn" id="processBtn" disabled onclick="processFiles()">
-      <span>Import & Sync</span>
+      <span>Analyse Attendance</span>
     </button>
 
     <div class="progress-wrap" id="progressWrap">
@@ -117,8 +112,8 @@
         <div class="step" id="step4"><div class="step-dot"></div>Building daily summaries</div>
         <div class="step" id="step5"><div class="step-dot"></div>Building punch details</div>
         <div class="step" id="step6"><div class="step-dot"></div>Merging with existing data</div>
-        <div class="step" id="step7"><div class="step-dot"></div>Removing records older than 6 months</div>
-        <div class="step" id="step8"><div class="step-dot"></div><span id="saveStepText">Saving to local server</span></div>
+        <div class="step" id="step7"><div class="step-dot"></div>Keeping all uploaded dates</div>
+        <div class="step" id="step8"><div class="step-dot"></div>Opening analysis</div>
       </div>
     </div>
 
@@ -153,6 +148,8 @@
     <div class="sync-status" id="empSyncStatus"></div>
     <div class="error-msg" id="empErrorMsg"></div>
   </div>
+  </div>
+  <iframe id="reportFrame" title="Attendance dashboard"></iframe>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script>
@@ -162,45 +159,23 @@
   const processBtn = document.getElementById('processBtn');
   const empInput   = document.getElementById('empFile');
   const empBtn     = document.getElementById('empBtn');
-  const browserOnly = window.BrowserStore.browserOnly;
-  const pagesToLocalServer = location.hostname.endsWith('.github.io') && !browserOnly;
-  if (pagesToLocalServer) {
-    document.getElementById('storageSubtitle').textContent = 'Imports are saved to the Node server on this PC. Keep node server.js running while using this GitHub link.';
-    document.getElementById('cachedText').textContent = 'Attendance data is available on the Node server on this PC.';
+  const reportFrame = document.getElementById('reportFrame');
+  window.AttSession = {
+    att_face_summary: [], att_fingerprint_summary: [],
+    att_ghr_summary: [], att_punch_details: [], master: []
+  };
+  function showDashboard(page = 'index.html') {
+    document.getElementById('uploadApp').style.display = 'none';
+    document.body.style.cssText = 'display:block;padding:0;';
+    reportFrame.style.display = 'block';
+    reportFrame.src = page;
   }
-  if (browserOnly) {
-    document.getElementById('storageSubtitle').textContent = 'Imports on this GitHub link are saved only in this browser on this device. Other users will not see them.';
-    document.getElementById('cachedText').textContent = 'Saved data is available in this browser. Upload new files to update it.';
-    document.getElementById('saveStepText').textContent = 'Saving in this browser';
+  function showUpload() {
+    reportFrame.style.display = 'none';
+    reportFrame.removeAttribute('src');
+    document.getElementById('uploadApp').style.display = '';
+    document.body.style.cssText = '';
   }
-
-  // Check if local server (or localStorage fallback) already has synced data
-  (async () => {
-    if (browserOnly) {
-      const saved = await window.BrowserStore.get('att_face_summary');
-      if (saved !== null || localStorage.getItem('att_face_summary')) {
-        document.getElementById('cachedBanner').classList.add('show');
-        document.getElementById('goDash').style.display = 'block';
-      }
-      return;
-    }
-    try {
-      const base = (typeof SERVER_BASE_URL !== 'undefined' && SERVER_BASE_URL) ? SERVER_BASE_URL : '';
-      const res = await fetch(base + '/api/attendance/att_face_summary', pagesToLocalServer ? { targetAddressSpace: 'loopback' } : {});
-      if (res.ok) {
-        document.getElementById('cachedBanner').classList.add('show');
-        document.getElementById('goDash').style.display = 'block';
-        return;
-      }
-    } catch (e) {
-      // Local server unreachable — fall through to localStorage check
-    }
-    if (pagesToLocalServer) return;
-    if (localStorage.getItem('att_face_summary')) {
-      document.getElementById('cachedBanner').classList.add('show');
-      document.getElementById('goDash').style.display = 'block';
-    }
-  })();
 
   function setupZone(input, zone, nameEl, onReady) {
     input.addEventListener('change', () => {
@@ -481,57 +456,7 @@
     return merged;
   }
 
-  // ── Six-month attendance retention ───────────────────────────────────────
-  // Removes attendance rows older than 6 months. Never applied to Employee Master.
-  function sixMonthsAgoStr() {
-    const d = new Date();
-    d.setMonth(d.getMonth() - 6);
-    const y = d.getFullYear(), mo = String(d.getMonth()+1).padStart(2,'0'), dy = String(d.getDate()).padStart(2,'0');
-    return `${y}-${mo}-${dy}`;
-  }
-  function applyRetention(rows, cutoff) {
-    return rows.filter(r => r.Date && r.Date >= cutoff);
-  }
-
-  // ── Read existing data from the local PC server ───────────────────────────
-  function apiBase() {
-    return (typeof SERVER_BASE_URL !== 'undefined' && SERVER_BASE_URL) ? SERVER_BASE_URL : '';
-  }
-  async function readExisting(key) {
-    if (browserOnly) {
-      const saved = await window.BrowserStore.get(key);
-      if (saved !== null) return saved;
-      const raw = localStorage.getItem(key);
-      return raw ? JSON.parse(raw) : [];
-    }
-    try {
-      const res = await fetch(apiBase() + '/api/attendance/' + encodeURIComponent(key), pagesToLocalServer ? { targetAddressSpace: 'loopback' } : {});
-      if (res.ok) return await res.json();
-      if (pagesToLocalServer) throw new Error('Local Node server returned ' + res.status);
-    } catch(e) {
-      if (pagesToLocalServer) throw new Error('Cannot reach the Node server on this PC at http://localhost:5000. Start node server.js and try again.');
-    }
-    // Fall back to localStorage if the server isn't reachable
-    const raw = localStorage.getItem(key);
-    return raw ? JSON.parse(raw) : [];
-  }
-
-  // ── Write to the local PC server (+ localStorage cache) ───────────────────
-  async function saveToCloud(key, data) {
-    if (browserOnly) return window.BrowserStore.put(key, data);
-    const json = JSON.stringify(data);
-    if (!pagesToLocalServer) try { localStorage.setItem(key, json); } catch(e) {}
-
-    const res = await fetch(apiBase() + '/api/attendance/' + encodeURIComponent(key), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: json,
-      ...(pagesToLocalServer ? { targetAddressSpace: 'loopback' } : {}),
-    });
-    if (!res.ok) throw new Error('Local server save failed (' + res.status + ')');
-  }
-
-  // ── Main process (Biometric + GreatHR — unchanged workflow, now with retention) ──
+  // ── Main process (Biometric + GreatHR, in memory) ─────────────────────────
   async function processFiles() {
     document.getElementById('progressWrap').classList.add('show');
     processBtn.disabled = true;
@@ -565,52 +490,40 @@
 
       setStep(5,'done'); setStep(6,'active'); setProgress(60,'Merging with existing data…');
       await tick();
-      // Read existing data from the local server first
-      const [exFace, exFP, exGHR, exPunches] = await Promise.all([
-        readExisting('att_face_summary'),
-        readExisting('att_fingerprint_summary'),
-        readExisting('att_ghr_summary'),
-        readExisting('att_punch_details'),
-      ]);
+      const exFace = window.AttSession.att_face_summary;
+      const exFP = window.AttSession.att_fingerprint_summary;
+      const exGHR = window.AttSession.att_ghr_summary;
+      const exPunches = window.AttSession.att_punch_details;
       let mergedFace    = mergeSummary(exFace,    faceSummary);
       let mergedFP      = mergeSummary(exFP,      fpSummary);
       let mergedGHR     = mergeSummary(exGHR,     ghrSummary);
       let mergedPunches = mergePunches(exPunches, punchDetails);
 
-      setStep(6,'done'); setStep(7,'active'); setProgress(72,'Removing records older than 6 months…');
+      setStep(6,'done'); setStep(7,'done'); setProgress(72,'Keeping all uploaded dates…');
+      setStep(8,'active'); setProgress(85,'Preparing reports…');
       await tick();
-      const cutoff = sixMonthsAgoStr();
-      mergedFace    = applyRetention(mergedFace,    cutoff);
-      mergedFP      = applyRetention(mergedFP,      cutoff);
-      mergedGHR     = applyRetention(mergedGHR,     cutoff);
-      mergedPunches = applyRetention(mergedPunches, cutoff);
-
-      setStep(7,'done'); setStep(8,'active'); setProgress(85,browserOnly ? 'Saving in this browser…' : 'Saving to local server…');
-      setSyncStatus('syncing', browserOnly ? '💾 Saving in this browser — please wait…' : '💾 Saving to local server — please wait…');
-      await tick();
-
-      await Promise.all([
-        saveToCloud('att_face_summary',        mergedFace),
-        saveToCloud('att_fingerprint_summary', mergedFP),
-        saveToCloud('att_ghr_summary',         mergedGHR),
-        saveToCloud('att_punch_details',       mergedPunches),
-      ]);
+      window.AttSession.att_face_summary = mergedFace;
+      window.AttSession.att_fingerprint_summary = mergedFP;
+      window.AttSession.att_ghr_summary = mergedGHR;
+      window.AttSession.att_punch_details = mergedPunches;
 
       setStep(8,'done'); setProgress(100,'Done!');
-      setSyncStatus('synced', browserOnly ? '✓ Saved in this browser on this device' : '✓ Saved to local server — all devices on this network will see updated data');
+      setSyncStatus('synced', '✓ Analysis ready in this tab');
+      document.getElementById('cachedBanner').classList.add('show');
+      document.getElementById('goDash').style.display = 'flex';
 
-      console.log(`✅ Face        : ${faceSummary.length} new → ${mergedFace.length} total (after 6-month retention)`);
-      console.log(`✅ Fingerprint : ${fpSummary.length} new → ${mergedFP.length} total (after 6-month retention)`);
-      console.log(`✅ Great HR    : ${ghrSummary.length} new → ${mergedGHR.length} total (after 6-month retention)`);
-      console.log(`✅ Punches     : ${punchDetails.length} new → ${mergedPunches.length} total (after 6-month retention)`);
+      console.log(`✅ Face        : ${faceSummary.length} new → ${mergedFace.length} total`);
+      console.log(`✅ Fingerprint : ${fpSummary.length} new → ${mergedFP.length} total`);
+      console.log(`✅ Great HR    : ${ghrSummary.length} new → ${mergedGHR.length} total`);
+      console.log(`✅ Punches     : ${punchDetails.length} new → ${mergedPunches.length} total`);
 
       await tick(1500);
-      window.location.href = 'index.html';
+      showDashboard();
 
     } catch (err) {
       setProgress(0,'Error');
       showError('Error: ' + err.message);
-      setSyncStatus('error', browserOnly ? '✗ Browser save failed — check browser storage settings and free space' : '✗ Save failed — check that the local server (node server.js) is running');
+      setSyncStatus('error', '✗ Could not analyse the selected files');
       processBtn.disabled = false;
       console.error(err);
     }
@@ -667,25 +580,6 @@
     return rows;
   }
 
-  // ── Employee Master read/merge/save (separate store — never overwritten wholesale) ──
-  async function readEmployeeMaster() {
-    if (browserOnly) {
-      const saved = await window.BrowserStore.get('emp_master');
-      if (saved !== null) return saved;
-      const raw = localStorage.getItem('emp_master');
-      return raw ? JSON.parse(raw) : [];
-    }
-    try {
-      const res = await fetch(apiBase() + '/api/employee-master', pagesToLocalServer ? { targetAddressSpace: 'loopback' } : {});
-      if (res.ok) return await res.json();
-      if (pagesToLocalServer) throw new Error('Local Node server returned ' + res.status);
-    } catch(e) {
-      if (pagesToLocalServer) throw new Error('Cannot reach the Node server on this PC at http://localhost:5000. Start node server.js and try again.');
-    }
-    const raw = localStorage.getItem('emp_master');
-    return raw ? JSON.parse(raw) : [];
-  }
-
   // Merge by Employee ID (fallback Employee Name). Existing employees not present
   // in the new upload are left completely unchanged. No one is ever removed.
   // Normalizes an Employee ID the same way att-data.js does (strips leading
@@ -722,20 +616,6 @@
     return [...Object.values(byId), ...Object.values(byName)];
   }
 
-  async function saveEmployeeMaster(data) {
-    if (browserOnly) return window.BrowserStore.put('emp_master', data);
-    const json = JSON.stringify(data);
-    if (!pagesToLocalServer) try { localStorage.setItem('emp_master', json); } catch(e) {}
-
-    const res = await fetch(apiBase() + '/api/employee-master', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: json,
-      ...(pagesToLocalServer ? { targetAddressSpace: 'loopback' } : {}),
-    });
-    if (!res.ok) throw new Error('Local server save failed (' + res.status + ')');
-  }
-
   // ── Employee Master process (independent of attendance import flow) ─────
   async function processEmployeeMaster() {
     document.getElementById('empProgressWrap').classList.add('show');
@@ -751,26 +631,25 @@
       await tick();
       const incoming = parseEmployeeMaster(ab);
 
-      setEmpProgress(55, 'Reading existing Employee Master…');
-      const existing = await readEmployeeMaster();
+      setEmpProgress(55, 'Reading this tab’s Employee Master…');
+      const existing = window.AttSession.master;
 
       setEmpProgress(70, 'Merging (no employees removed)…');
       await tick();
       const merged = mergeEmployeeMaster(existing, incoming);
 
-      setEmpProgress(85, browserOnly ? 'Saving in this browser…' : 'Saving to local server…');
-      setEmpSyncStatus('syncing', '💾 Saving Employee Master — please wait…');
+      setEmpProgress(85, 'Preparing Employee Master…');
       await tick();
-      await saveEmployeeMaster(merged);
+      window.AttSession.master = merged;
 
       setEmpProgress(100, 'Done!');
-      setEmpSyncStatus('synced', browserOnly ? `✓ Employee Master saved in this browser — ${merged.length} employees total` : `✓ Employee Master synced — ${merged.length} employees total`);
+      setEmpSyncStatus('synced', `✓ Employee Master ready in this tab — ${merged.length} employees total`);
       console.log(`✅ Employee Master: ${incoming.length} in upload → ${merged.length} total after merge`);
 
     } catch (err) {
       setEmpProgress(0, 'Error');
       showEmpError('Error: ' + err.message);
-      setEmpSyncStatus('error', browserOnly ? '✗ Browser save failed — check browser storage settings and free space' : '✗ Save failed — check that the local server (node server.js) is running');
+      setEmpSyncStatus('error', '✗ Could not analyse the Employee Master file');
       empBtn.disabled = false;
       console.error(err);
     }

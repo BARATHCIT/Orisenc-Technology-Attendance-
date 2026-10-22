@@ -1,21 +1,16 @@
 /**
  * att-data.js
  * Intercepts fetch() calls for the dashboard JSON files.
- * Reads from the local PC server (server.js) with localStorage as fallback/cache
- * in case the server isn't reachable.
+ * Reads uploaded attendance from the Import Centre's in-memory session.
  *
- * Attendance files intercepted (stored under data/attendance/<key>.json on the server):
+ * Attendance files intercepted:
  *   face_summary.json        ← att_face_summary
  *   fingerprint_summary.json ← att_fingerprint_summary
  *   greathr_summary.json     ← att_ghr_summary
  *   punch_details.json       ← att_punch_details
  *
- * Reference file intercepted (stored separately at data/employee_master.json,
- * so it is never affected by the 6-month attendance retention cleanup):
- *   employee_master.json     ← /api/employee-master
- *
- * Add <script src="server-config.js"></script> BEFORE this file in each page.
- * Add <script src="att-data.js"></script>       in <head> of all dashboard pages.
+ * Reference file intercepted:
+ *   employee_master.json     ← uploaded Employee Master
  */
 
 
@@ -85,56 +80,16 @@
     return id != null ? normalizeId(id) : '';
   }
 
-  // ── Local PC server helpers ──────────────────────────────────────────────
-  // server.js exposes:
-  //   GET /api/attendance/:key   → JSON array for that attendance dataset
-  //   GET /api/employee-master   → JSON array of Employee Master rows
-  // SERVER_BASE_URL comes from server-config.js. Leave it blank ('') to use
-  // the same host that served the page (the normal case on the host PC).
-
-  function apiBase() {
-    return (typeof SERVER_BASE_URL !== 'undefined' && SERVER_BASE_URL) ? SERVER_BASE_URL : '';
+  // The Import Centre remains open as this page's parent while reports change
+  // inside its frame. Reloading or closing the tab discards the session.
+  function session() {
+    return window.parent !== window ? window.parent.AttSession : window.AttSession;
+  }
+  if (!session() && window.parent === window) {
+    location.replace('upload.html');
   }
 
-  const browserOnly = window.BrowserStore && window.BrowserStore.browserOnly;
-  const pagesToLocalServer = location.hostname.endsWith('.github.io') && !browserOnly;
-
-  // localStorage cache key is namespaced by store so employee master and
-  // attendance data never collide even if a filename were reused.
-  function cacheKey(store, key) {
-    return store === 'employeeMaster' ? 'emp_master' : key;
-  }
-
-  async function readFromServer(store, key) {
-    if (browserOnly) return null;
-    try {
-      const path = store === 'employeeMaster'
-        ? '/api/employee-master'
-        : '/api/attendance/' + encodeURIComponent(key);
-      const res = await _fetch(apiBase() + path, {
-        cache: 'no-store',
-        ...(pagesToLocalServer ? { targetAddressSpace: 'loopback' } : {}),
-      });
-      if (!res.ok) return pagesToLocalServer ? [] : null;
-      const data = await res.json();
-      try { localStorage.setItem(cacheKey(store, key), JSON.stringify(data)); } catch(e){}
-      return data;
-    } catch (e) {
-      console.warn('Local server read failed:', e.message);
-      return pagesToLocalServer ? [] : null;
-    }
-  }
-
-  async function readFromLocalStorage(store, key) {
-    if (browserOnly) {
-      const saved = await window.BrowserStore.get(cacheKey(store, key));
-      if (saved !== null) return saved;
-    }
-    const raw = localStorage.getItem(cacheKey(store, key));
-    return raw ? JSON.parse(raw) : [];
-  }
-
-  // ── Intercept fetch ──────────────────────────────────────────────────────
+  // ── Intercept the existing report pages' JSON reads ─────────────────────
   const _fetch = window.fetch.bind(window);
 
   window.fetch = function (url, opts) {
@@ -142,16 +97,22 @@
     const entry = MAP[filename];
     if (!entry) return _fetch(url, opts);
 
-    // Try the local server first, fall back to localStorage
-    return readFromServer(entry.store, entry.key).then(async data => {
-      const result = data || await readFromLocalStorage(entry.store, entry.key);
-      return {
-        ok:   true,
-        json: () => Promise.resolve(result),
-        text: () => Promise.resolve(JSON.stringify(result)),
-      };
+    const current = session();
+    const result = current ? current[entry.key] || [] : [];
+    return Promise.resolve({
+      ok: true,
+      json: () => Promise.resolve(result),
+      text: () => Promise.resolve(JSON.stringify(result)),
     });
   };
+
+  document.addEventListener('click', event => {
+    const link = event.target.closest('a[href]');
+    if (link && link.getAttribute('href').split('?')[0] === 'upload.html' && window.parent !== window && window.parent.showUpload) {
+      event.preventDefault();
+      window.parent.showUpload();
+    }
+  });
 
   // ── Shared Employee Master / Team lookup helper ─────────────────────────
   // Any dashboard page can call window.AttData.buildTeamLookup() to get a
@@ -161,8 +122,7 @@
   // attendance record in storage.
 
   async function getEmployeeMaster() {
-    const data = await readFromServer('employeeMaster', 'master');
-    return data || await readFromLocalStorage('employeeMaster', 'master');
+    return session()?.master || [];
   }
 
   function buildLookupFromMaster(master) {

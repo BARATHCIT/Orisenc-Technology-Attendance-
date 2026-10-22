@@ -1,9 +1,7 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="light">
 <head>
-<script src="server-config.js?v=loopback2"></script>
-<script src="browser-store.js?v=loopback2"></script>
-<script src="att-data.js?v=loopback2"></script>
+<script src="att-data.js?v=memory1"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Attendance Dashboard</title>
@@ -440,12 +438,12 @@ Promise.all([
 
 document.getElementById("updated").innerHTML =
 `<div style="text-align:right">
-    <div style="font-size:11px;color:var(--muted)">Last synced</div>
+    <div style="font-size:11px;color:var(--muted)">Analysed in this tab</div>
     <div style="font-weight:600">${time}</div>
 </div>`;
   render();
 }).catch(()=>{
-  document.getElementById("tbody").innerHTML=`<tr><td colspan="11"><div class="no-data">⚠ Could not load JSON files<small>Run the local Node server and refresh this page</small></div></td></tr>`;
+  document.getElementById("tbody").innerHTML=`<tr><td colspan="11"><div class="no-data">⚠ Could not load attendance<small>Open the Import Centre and choose your files again</small></div></td></tr>`;
   document.getElementById("count-pill").textContent="Error";
 });
 
