@@ -129,7 +129,7 @@
       <input type="file" id="empFile" accept=".xlsx,.xls">
       <span class="upload-icon">🗂️</span>
       <div class="upload-label">Employee Master</div>
-      <div class="upload-hint">Employee ID · Employee Name · Team · .xlsx</div>
+      <div class="upload-hint">Emp ID / Employee ID · Name / Employee Name · Department / Team · .xlsx or .xls</div>
       <div class="file-name" id="empFileName"></div>
     </div>
 
@@ -565,10 +565,13 @@
     if (!raw.length) throw new Error('Employee Master file appears empty.');
 
     const headers = raw[0].map(h => String(h||'').trim());
-    const COL = {}; headers.forEach((h, i) => { COL[h] = i; });
-    const iId = COL['Employee ID'], iName = COL['Employee Name'], iTeam = COL['Team'];
+    const COL = {};
+    headers.forEach((h, i) => { COL[h.replace(/\s+/g, ' ').toLowerCase()] = i; });
+    const iId = COL['employee id'] ?? COL['emp id'];
+    const iName = COL['employee name'] ?? COL['name'];
+    const iTeam = COL['team'] ?? COL['department'];
     if (iId === undefined || iName === undefined || iTeam === undefined)
-      throw new Error(`Missing required columns. Expected "Employee ID", "Employee Name", "Team". Found: ${headers.filter(Boolean).join(', ')}`);
+      throw new Error(`Missing required columns. Expected "Employee ID" or "Emp ID", "Employee Name" or "Name", and "Team" or "Department". Found: ${headers.filter(Boolean).join(', ')}`);
 
     const rows = [];
     for (let r = 1; r < raw.length; r++) {

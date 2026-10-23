@@ -1,6 +1,6 @@
 # Attendance Analysis
 
-A static web page for analysing Biometric and GreatHR attendance files. Open the [GitHub Pages app](https://barathcit.github.io/Orisenc-Technology-Attendance-/), choose both attendance reports, and select **Analyse Attendance**. You can then use the Dashboard, Employee Lookup, View by Date, and Reports pages. To use Team filters and absent reports, select the Employee Master file in the same session; it is included automatically when you analyse attendance.
+A static web page for analysing Biometric and GreatHR attendance files. Open the [GitHub Pages app](https://barathcit.github.io/Orisenc-Technology-Attendance-/), choose both attendance reports, and select **Analyse Attendance**. You can then use the Dashboard, Employee Lookup, View by Date, and Reports pages. To use Team filters and absent reports, select the Employee Master file in the same session; it is included automatically when you analyse attendance. Employee Master accepts either `Employee ID, Employee Name, Team` or `Emp ID, Name, Department` headings.
 
 ## Data handling
 
