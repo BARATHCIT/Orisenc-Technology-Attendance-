@@ -65,6 +65,9 @@
     .sync-status.synced{display:block;background:rgba(78,204,163,.1);border:1px solid rgba(78,204,163,.3);color:var(--success);}
     .sync-status.error{display:block;background:rgba(255,92,108,.1);border:1px solid rgba(255,92,108,.3);color:var(--danger);}
     #reportFrame{display:none;width:100%;height:100vh;border:0;}
+    .bulk-preview{display:none;margin-top:14px;font-size:13px;line-height:1.7;word-break:break-word;}
+    .bulk-preview.show{display:block;}
+    .bulk-preview strong{color:var(--text);}
   </style>
 </head>
 <body>
@@ -74,6 +77,23 @@
   <p class="subtitle">Choose attendance files to analyse. Records stay only in this open tab and disappear when you close or reload it.</p>
 
   <div class="card">
+    <div class="card-title">Upload all three files together</div>
+    <div class="card-hint">Select the Biometric, GreatHR, and Employee Master files together. The page checks their columns and shows which file is which before analysis.</div>
+    <div class="upload-zone" id="bulkZone">
+      <input type="file" id="bulkFiles" accept=".xlsx,.xls" multiple>
+      <span class="upload-icon">📂</span>
+      <div class="upload-label">Choose 3 files</div>
+      <div class="upload-hint">Biometric · GreatHR · Employee Master</div>
+      <div class="file-name" id="bulkFileName"></div>
+    </div>
+    <div class="bulk-preview" id="bulkPreview"></div>
+    <div class="error-msg" id="bulkError"></div>
+    <button class="btn" id="bulkProcessBtn" disabled onclick="processFiles()" style="margin-top:18px">Analyse verified files</button>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Upload files separately</div>
+    <div class="card-hint">The original upload fields are available below. Choose Biometric and GreatHR, then optionally Employee Master.</div>
     <div class="cached-banner" id="cachedBanner"><span>✓</span><span>Attendance data is ready for analysis in this tab.</span></div>
     <button class="btn btn-secondary" id="goDash" style="display:none;margin-bottom:18px" onclick="showDashboard()">Open Dashboard</button>
 
@@ -159,6 +179,8 @@
   const processBtn = document.getElementById('processBtn');
   const empInput   = document.getElementById('empFile');
   const empBtn     = document.getElementById('empBtn');
+  const bulkInput = document.getElementById('bulkFiles');
+  const bulkProcessBtn = document.getElementById('bulkProcessBtn');
   const reportFrame = document.getElementById('reportFrame');
   window.AttSession = {
     att_face_summary: [], att_fingerprint_summary: [],
@@ -196,6 +218,117 @@
   setupZone(ghrInput, document.getElementById('ghrZone'), document.getElementById('ghrFileName'), checkReady);
   setupZone(empInput, document.getElementById('empZone'), document.getElementById('empFileName'), () => { empBtn.disabled = !empInput.files[0]; });
   function checkReady() { processBtn.disabled = !(bioInput.files[0] && ghrInput.files[0]); }
+
+  function classifyWorkbook(workbook) {
+    const sheets = workbook.SheetNames.map(name => workbook.Sheets[name]);
+    const hasColumns = (row, names) => names.every(name => row.includes(name));
+    for (const sheet of sheets) {
+      const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null, sheetRows: 8 });
+      for (const row of rows) {
+        const headers = (row || []).map(value => String(value || '').trim().replace(/\s+/g, ' ').toLowerCase());
+        if (hasColumns(headers, ['user id', 'punch time'])) return 'bio';
+        if (hasColumns(headers, ['employee no', 'swipe date'])) return 'ghr';
+        if ((headers.includes('employee id') || headers.includes('emp id')) &&
+            (headers.includes('employee name') || headers.includes('name')) &&
+            (headers.includes('team') || headers.includes('department'))) return 'emp';
+      }
+    }
+    return null;
+  }
+
+  function useFileForInput(input, zoneId, nameId, file) {
+    const transfer = new DataTransfer();
+    transfer.items.add(file);
+    input.files = transfer.files;
+    document.getElementById(zoneId).classList.add('done');
+    document.getElementById(nameId).textContent = '✓ ' + file.name;
+  }
+
+  let bulkSelection = 0;
+  let bulkAssigned = false;
+  async function handleBulkFiles(files) {
+    const selection = ++bulkSelection;
+    const preview = document.getElementById('bulkPreview');
+    const error = document.getElementById('bulkError');
+    preview.classList.remove('show');
+    error.classList.remove('show');
+    document.getElementById('bulkZone').classList.remove('done');
+    bulkProcessBtn.disabled = true;
+    if (bulkAssigned) {
+      for (const [input, zoneId, nameId] of [
+        [bioInput, 'bioZone', 'bioFileName'], [ghrInput, 'ghrZone', 'ghrFileName'], [empInput, 'empZone', 'empFileName']
+      ]) {
+        input.value = '';
+        document.getElementById(zoneId).classList.remove('done');
+        document.getElementById(nameId).textContent = '';
+      }
+      bulkAssigned = false;
+      checkReady();
+      empBtn.disabled = true;
+    }
+    if (files.length !== 3) {
+      error.textContent = 'Choose exactly 3 files: Biometric, GreatHR, and Employee Master.';
+      error.classList.add('show');
+      return;
+    }
+    preview.textContent = 'Checking file columns and records…';
+    preview.classList.add('show');
+    const found = {};
+    try {
+      for (const file of files) {
+        if (!/\.xlsx?$/i.test(file.name)) throw new Error(`${file.name}: choose an .xls or .xlsx file.`);
+        const buffer = await readFile(file);
+        if (selection !== bulkSelection) return;
+        const workbook = XLSX.read(buffer, { type: 'array', cellDates: false });
+        const type = classifyWorkbook(workbook);
+        if (!type) throw new Error(`${file.name}: columns do not match a Biometric, GreatHR, or Employee Master report.`);
+        if (found[type]) throw new Error(`${file.name}: two files were identified as ${type === 'bio' ? 'Biometric' : type === 'ghr' ? 'GreatHR' : 'Employee Master'}.`);
+        const count = type === 'bio'
+          ? (() => { const records = parseBiometric(buffer); return records.faceRecords.length + records.fpRecords.length; })()
+          : type === 'ghr' ? parseGreatHR(buffer).length : parseEmployeeMaster(buffer).length;
+        if (!count) throw new Error(`${file.name}: no usable records were found.`);
+        found[type] = { file, count };
+      }
+      if (!found.bio || !found.ghr || !found.emp) throw new Error('The selection must contain one Biometric, one GreatHR, and one Employee Master file.');
+      if (selection !== bulkSelection) return;
+      useFileForInput(bioInput, 'bioZone', 'bioFileName', found.bio.file);
+      useFileForInput(ghrInput, 'ghrZone', 'ghrFileName', found.ghr.file);
+      useFileForInput(empInput, 'empZone', 'empFileName', found.emp.file);
+      document.getElementById('bulkZone').classList.add('done');
+      document.getElementById('bulkFileName').textContent = '✓ All 3 files identified';
+      const lines = [
+        ['Biometric', found.bio], ['GreatHR', found.ghr], ['Employee Master', found.emp]
+      ];
+      preview.replaceChildren(...lines.map(([label, item]) => {
+        const line = document.createElement('div');
+        const strong = document.createElement('strong');
+        strong.textContent = `${label}: `;
+        line.append(strong, document.createTextNode(`${item.file.name} — ${item.count.toLocaleString()} records`));
+        return line;
+      }));
+      checkReady();
+      empBtn.disabled = false;
+      bulkAssigned = true;
+      bulkProcessBtn.disabled = false;
+    } catch (err) {
+      if (selection !== bulkSelection) return;
+      preview.classList.remove('show');
+      error.textContent = err.message;
+      error.classList.add('show');
+    }
+  }
+  bulkInput.addEventListener('change', () => handleBulkFiles(Array.from(bulkInput.files)));
+  [bioInput, ghrInput, empInput].forEach(input => input.addEventListener('change', () => {
+    bulkAssigned = false;
+    bulkProcessBtn.disabled = true;
+    document.getElementById('bulkZone').classList.remove('done');
+    document.getElementById('bulkPreview').classList.remove('show');
+  }));
+  document.getElementById('bulkZone').addEventListener('dragover', event => event.preventDefault());
+  document.getElementById('bulkZone').addEventListener('drop', event => {
+    event.preventDefault();
+    handleBulkFiles(Array.from(event.dataTransfer.files));
+  });
 
   function setStep(n, state) { document.getElementById('step'+n).className = 'step '+state; }
   function setProgress(pct, label) {
@@ -460,6 +593,7 @@
   async function processFiles() {
     document.getElementById('progressWrap').classList.add('show');
     processBtn.disabled = true;
+    bulkProcessBtn.disabled = true;
     document.getElementById('errorMsg').classList.remove('show');
     document.getElementById('syncStatus').className = 'sync-status';
 
@@ -529,8 +663,14 @@
     } catch (err) {
       setProgress(0,'Error');
       showError('Error: ' + err.message);
+      if (bulkAssigned) {
+        const bulkError = document.getElementById('bulkError');
+        bulkError.textContent = 'Could not analyse files: ' + err.message;
+        bulkError.classList.add('show');
+      }
       setSyncStatus('error', '✗ Could not analyse the selected files');
       processBtn.disabled = false;
+      bulkProcessBtn.disabled = !bulkAssigned;
       console.error(err);
     }
   }
