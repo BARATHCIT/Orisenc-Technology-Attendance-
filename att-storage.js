@@ -64,7 +64,7 @@
       const attendance = await Promise.allSettled(attendanceKeys.map(readServer));
       attendance.forEach((result, index) => { server[index] = result; });
     } catch (error) {
-      console.info('Local Node server is unavailable; using saved browser data.');
+      console.warn('Local Node server read failed:', error);
     }
     const data = {};
     keys.forEach((key, index) => {
@@ -107,7 +107,7 @@
       await readServer('master');
       server = await Promise.allSettled(selectedKeys.map(key => writeServer(key, data[key])));
     } catch (error) {
-      console.info('Local Node server is unavailable; saved in this browser.');
+      console.warn('Local Node server save is unavailable:', error);
     }
     const browserSaved = browser.every(result => result.status === 'fulfilled');
     const serverSaved = server.every(result => result.status === 'fulfilled');
