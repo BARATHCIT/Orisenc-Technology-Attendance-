@@ -359,14 +359,13 @@
     return { date, isWeekend: weekend, employees };
   }
 
-  // Login-status color/tooltip (Early / On Time / Late) — single source of truth
+  // Login-status color/tooltip — 09:35 is the last on-time minute.
   function getLoginStatus(timeStr) {
     if (!timeStr || timeStr === '—') return null;
     const [h, m] = timeStr.split(':').map(Number);
     const mins = h * 60 + m;
-    if (mins < 9 * 60 + 30)  return { color: 'var(--green)', tooltip: 'Early Login' };
-    if (mins <= 9 * 60 + 45) return { color: '#4a9eff',      tooltip: 'On Time' };
-    return                          { color: 'var(--amber)', tooltip: 'Late Login' };
+    if (mins <= 9 * 60 + 35) return { color: 'var(--green)', tooltip: 'On Time' };
+    return                         { color: 'var(--amber)', tooltip: 'Late Login' };
   }
 
   // Expected working hours for a date (Saturday = half day, else full day)

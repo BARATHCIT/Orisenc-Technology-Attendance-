@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="light">
 <head>
-<script src="att-data.js?v=landing1"></script>
+<script src="att-data.js?v=login935"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Day View — Attendance</title>
@@ -136,7 +136,7 @@ tbody td:first-child{text-align:center;color:var(--muted);font-size:13px;}
 .emp-id-col{font-size:13px;color:var(--muted);font-family:'Space Grotesk',sans-serif;}
 .team-pill{display:inline-block;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:600;background:var(--pill-bg);color:var(--pill-txt);white-space:nowrap;}
 .t-in{color:var(--green);font-weight:600;}
-.t-out{color:var(--accent2);font-weight:600;}
+.t-out{color:var(--text);font-weight:600;}
 /* punch count */
 .pnch{font-size:13px;text-align:center;}
 .pnch-mode{font-weight:600;color:var(--text);}
@@ -326,9 +326,8 @@ function getLoginStatus(timeStr) {
   if (!timeStr || timeStr === "—") return null;
   const [h, m] = timeStr.split(":").map(Number);
   const mins = h * 60 + m;
-  if (mins < 9 * 60 + 30)  return { color: "var(--green)", tooltip: "Early Login" };
-  if (mins <= 9 * 60 + 45) return { color: "#4a9eff",      tooltip: "On Time" };
-  return                           { color: "var(--amber)", tooltip: "Late Login" };
+  if (mins <= 9 * 60 + 35) return { color: "var(--green)", tooltip: "On Time" };
+  return                         { color: "var(--amber)", tooltip: "Late Login" };
 }
 function getExpectedHours(dateStr) {
   if (!dateStr) return 8;

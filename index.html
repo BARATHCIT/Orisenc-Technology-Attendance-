@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="light">
 <head>
-<script src="att-data.js?v=landing1"></script>
+<script src="att-data.js?v=login935"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Attendance Dashboard</title>
@@ -114,7 +114,7 @@ tbody tr:hover .badge{
 .team-pill{display:inline-block;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:600;background:var(--pill-bg);color:var(--pill-txt);white-space:nowrap;}
 .date-val{color:var(--muted);font-size:14px;}
 .t-in{color:var(--green);font-weight:600;}
-.t-out{color:var(--accent2);font-weight:600;}
+.t-out{color:var(--text);font-weight:600;}
 .hrs{font-weight:600;}
 /* punch count: mode part bold, total part muted */
 .pnch-mode{
@@ -247,9 +247,8 @@ tbody tr:hover .badge{
 </div>
 
 <div class="legend">
-  <span class="legend-item"><span class="legend-dot" style="background:var(--green)"></span>Early Login (&lt;09:30)</span>
-  <span class="legend-item"><span class="legend-dot" style="background:#4a9eff"></span>On Time (09:30–09:45)</span>
-  <span class="legend-item"><span class="legend-dot" style="background:var(--amber)"></span>Late Login (&gt;09:45)</span>
+  <span class="legend-item"><span class="legend-dot" style="background:var(--green)"></span>On Time (by 09:35)</span>
+  <span class="legend-item"><span class="legend-dot" style="background:var(--amber)"></span>Late Login (after 09:35)</span>
 </div>
 
 <div class="table-wrap">
@@ -509,9 +508,8 @@ function getLoginStatus(timeStr) {
   if (!timeStr || timeStr === "—") return null;
   const [h, m] = timeStr.split(":").map(Number);
   const mins = h * 60 + m;
-  if (mins < 9 * 60 + 30)  return { color: "var(--green)",   tooltip: "Early Login" };
-  if (mins <= 9 * 60 + 45) return { color: "#4a9eff",         tooltip: "On Time" };
-  return                           { color: "var(--amber)",   tooltip: "Late Login" };
+  if (mins <= 9 * 60 + 35) return { color: "var(--green)", tooltip: "On Time" };
+  return                         { color: "var(--amber)", tooltip: "Late Login" };
 }
 function getExpectedHours(dateStr) {
   if (!dateStr) return 8;
