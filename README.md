@@ -4,9 +4,11 @@ A static web page for analysing Biometric and GreatHR attendance files. Open the
 
 ## Data handling
 
-Uploaded records remain in memory in the open browser tab. The app does not send attendance records to a server or write them to localStorage, IndexedDB, or cookies. Closing or reloading the tab discards the analysis; upload the files again to continue. You can export reports to Excel or print them when you need a copy. No Node.js installation or local server is required.
+Imports are saved persistently in this browser using IndexedDB. Closing or reloading the tab does not require another upload; select **Open Dashboard** when saved data appears. Browser storage belongs to the browser profile and website address used for the import.
 
-Existing local `data/` and `backups/` folders from older versions are not read by this web app. They remain ignored by Git.
+When the local Node server is running on the same PC, imports are also saved as JSON under `data/attendance/` and `data/employee_master.json`. The site loads and combines browser and server copies so records saved while the server was offline are still available. The page shows where each save succeeded. The `data/` and `backups/` folders remain ignored by Git and are not published on GitHub Pages.
+
+To run the local server, use `npm install` once and then `node server.js` from this folder. The GitHub Pages app connects to `127.0.0.1:5000` on the PC opening the page. The app also works without the server using browser storage. You can export reports to Excel or print them.
 
 ## Features
 
@@ -19,12 +21,14 @@ Existing local `data/` and `backups/` folders from older versions are not read b
 
 ## Files
 
-- `upload.html`: imports and keeps the current tab's data in memory
+- `upload.html`: imports files, restores saved data, and opens reports
 - `index.html`: dashboard
 - `employee.html`: employee lookup
 - `dayview.html`: day view
 - `reports.html`: reports
-- `att-data.js`: shared in-memory data access and attendance calculations
+- `att-data.js`: shared attendance data access and calculations
+- `att-storage.js`, `browser-store.js`: persistent browser and server saving
+- `server.js`: optional local Node server for JSON files
 - `images/`: visual assets
 
 ## Author

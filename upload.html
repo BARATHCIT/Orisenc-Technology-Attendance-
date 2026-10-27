@@ -74,7 +74,8 @@
   <div id="uploadApp">
   <div class="logo">Attendance System</div>
   <h1>Attendance Analysis</h1>
-  <p class="subtitle">Choose attendance files to analyse. Records stay only in this open tab and disappear when you close or reload it.</p>
+  <p class="subtitle">Choose attendance files to analyse. Saved records reopen in this browser, and are also saved to the local Node server when it is running on this PC.</p>
+  <div class="sync-status syncing" id="storageStatus" style="margin:0 auto 20px;max-width:520px">Checking saved attendance data…</div>
 
   <div class="card">
     <div class="card-title">Upload all three files together</div>
@@ -94,7 +95,7 @@
   <div class="card">
     <div class="card-title">Upload files separately</div>
     <div class="card-hint">The original upload fields are available below. Choose Biometric and GreatHR, then optionally Employee Master.</div>
-    <div class="cached-banner" id="cachedBanner"><span>✓</span><span>Attendance data is ready for analysis in this tab.</span></div>
+    <div class="cached-banner" id="cachedBanner"><span>✓</span><span>Saved attendance data is ready to view.</span></div>
     <button class="btn btn-secondary" id="goDash" style="display:none;margin-bottom:18px" onclick="showDashboard()">Open Dashboard</button>
 
     <div class="upload-zone" id="bioZone">
@@ -133,7 +134,7 @@
         <div class="step" id="step5"><div class="step-dot"></div>Building punch details</div>
         <div class="step" id="step6"><div class="step-dot"></div>Merging with existing data</div>
         <div class="step" id="step7"><div class="step-dot"></div>Keeping all uploaded dates</div>
-        <div class="step" id="step8"><div class="step-dot"></div>Opening analysis</div>
+        <div class="step" id="step8"><div class="step-dot"></div>Saving data and opening analysis</div>
       </div>
     </div>
 
@@ -143,7 +144,7 @@
 
   <div class="card">
     <div class="card-title">Employee Master</div>
-    <div class="card-hint">Upload this file each time you open the page to use Team filters and absent reports. If selected, it is included when you analyse attendance.</div>
+    <div class="card-hint">Upload or update this file when employee information changes. Saved Team filters and absent reports will be available next time you open the page.</div>
 
     <div class="upload-zone" id="empZone">
       <input type="file" id="empFile" accept=".xlsx,.xls">
@@ -171,6 +172,9 @@
   </div>
   <iframe id="reportFrame" title="Attendance dashboard"></iframe>
 
+  <script src="server-config.js?v=storage1"></script>
+  <script src="browser-store.js?v=storage1"></script>
+  <script src="att-storage.js?v=storage1"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script>
   // ── UI setup ──────────────────────────────────────────────────────────────
@@ -186,6 +190,31 @@
     att_face_summary: [], att_fingerprint_summary: [],
     att_ghr_summary: [], att_punch_details: [], master: []
   };
+  const storageReady = window.AttStorage.load({
+    summary: mergeSummary, punches: mergePunches, master: mergeEmployeeMaster
+  }).then(result => {
+    Object.assign(window.AttSession, result.data);
+    const status = document.getElementById('storageStatus');
+    status.className = 'sync-status synced';
+    status.textContent = result.hasAttendance
+      ? `✓ Saved attendance loaded${result.serverAvailable ? ' · local server connected' : ' · browser copy available'}`
+      : `No saved attendance yet${result.serverAvailable ? ' · local server connected' : ''}`;
+    if (result.hasAttendance) {
+      document.getElementById('cachedBanner').classList.add('show');
+      document.getElementById('goDash').style.display = 'flex';
+    }
+    return result;
+  }).catch(error => {
+    const status = document.getElementById('storageStatus');
+    status.className = 'sync-status error';
+    status.textContent = 'Could not load saved attendance: ' + error.message;
+    console.error(error);
+  });
+  function savedMessage(result) {
+    if (result.browserSaved && result.serverSaved) return '✓ Saved in this browser and on the local Node server';
+    if (result.browserSaved) return '✓ Saved in this browser; local Node server unavailable';
+    return '✓ Saved on the local Node server; browser storage unavailable';
+  }
   function showDashboard(page = 'index.html') {
     document.getElementById('uploadApp').style.display = 'none';
     document.body.style.cssText = 'display:block;padding:0;';
@@ -598,6 +627,7 @@
     document.getElementById('syncStatus').className = 'sync-status';
 
     try {
+      await storageReady;
       setStep(1,'active'); setProgress(5,'Reading Biometric file…');
       const bioAB = await readFile(bioInput.files[0]);
 
@@ -634,21 +664,27 @@
       let mergedPunches = mergePunches(exPunches, punchDetails);
 
       setStep(6,'done'); setStep(7,'done'); setProgress(72,'Keeping all uploaded dates…');
-      setStep(8,'active'); setProgress(85,'Preparing reports…');
+      setStep(8,'active'); setProgress(85,'Saving attendance…');
       await tick();
-      window.AttSession.att_face_summary = mergedFace;
-      window.AttSession.att_fingerprint_summary = mergedFP;
-      window.AttSession.att_ghr_summary = mergedGHR;
-      window.AttSession.att_punch_details = mergedPunches;
+      const nextSession = {
+        ...window.AttSession,
+        att_face_summary: mergedFace,
+        att_fingerprint_summary: mergedFP,
+        att_ghr_summary: mergedGHR,
+        att_punch_details: mergedPunches
+      };
       if (empInput.files[0]) {
         const masterAB = await readFile(empInput.files[0]);
         const incomingMaster = parseEmployeeMaster(masterAB);
-        window.AttSession.master = mergeEmployeeMaster(window.AttSession.master, incomingMaster);
-        setEmpSyncStatus('synced', `✓ Employee Master ready in this tab — ${window.AttSession.master.length} employees total`);
+        nextSession.master = mergeEmployeeMaster(window.AttSession.master, incomingMaster);
       }
+      const saved = await window.AttStorage.save(nextSession);
+      Object.assign(window.AttSession, nextSession);
+      if (empInput.files[0]) setEmpSyncStatus('synced', `✓ Employee Master saved — ${nextSession.master.length} employees total`);
 
       setStep(8,'done'); setProgress(100,'Done!');
-      setSyncStatus('synced', '✓ Analysis ready in this tab');
+      setSyncStatus('synced', savedMessage(saved));
+      document.getElementById('storageStatus').textContent = savedMessage(saved);
       document.getElementById('cachedBanner').classList.add('show');
       document.getElementById('goDash').style.display = 'flex';
 
@@ -773,6 +809,7 @@
     document.getElementById('empSyncStatus').className = 'sync-status';
 
     try {
+      await storageReady;
       setEmpProgress(10, 'Reading Employee Master file…');
       const ab = await readFile(empInput.files[0]);
 
@@ -780,19 +817,21 @@
       await tick();
       const incoming = parseEmployeeMaster(ab);
 
-      setEmpProgress(55, 'Reading this tab’s Employee Master…');
+      setEmpProgress(55, 'Reading saved Employee Master…');
       const existing = window.AttSession.master;
 
       setEmpProgress(70, 'Merging (no employees removed)…');
       await tick();
       const merged = mergeEmployeeMaster(existing, incoming);
 
-      setEmpProgress(85, 'Preparing Employee Master…');
+      setEmpProgress(85, 'Saving Employee Master…');
       await tick();
+      const saved = await window.AttStorage.save({ master: merged }, ['master']);
       window.AttSession.master = merged;
 
       setEmpProgress(100, 'Done!');
-      setEmpSyncStatus('synced', `✓ Employee Master ready in this tab — ${merged.length} employees total`);
+      setEmpSyncStatus('synced', `${savedMessage(saved)} — ${merged.length} employees total`);
+      document.getElementById('storageStatus').textContent = savedMessage(saved);
       console.log(`✅ Employee Master: ${incoming.length} in upload → ${merged.length} total after merge`);
 
     } catch (err) {

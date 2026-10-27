@@ -1,7 +1,7 @@
 /**
  * att-data.js
  * Intercepts fetch() calls for the dashboard JSON files.
- * Reads uploaded attendance from the Import Centre's in-memory session.
+ * Reads attendance restored by the Import Centre from browser or local server storage.
  *
  * Attendance files intercepted:
  *   face_summary.json        ← att_face_summary
@@ -81,7 +81,7 @@
   }
 
   // The Import Centre remains open as this page's parent while reports change
-  // inside its frame. Reloading or closing the tab discards the session.
+  // inside its frame. A new tab restores the saved data before opening reports.
   function session() {
     return window.parent !== window ? window.parent.AttSession : window.AttSession;
   }
