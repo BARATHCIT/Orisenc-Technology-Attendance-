@@ -4,7 +4,7 @@ A static web page for analysing Biometric and GreatHR attendance files. The [Git
 
 ## Data handling
 
-Imports are saved persistently in this browser using IndexedDB. Closing or reloading the tab does not require another upload; the Dashboard opens with saved data. Browser storage belongs to the browser profile and website address used for the import.
+Imports are saved persistently in this browser using IndexedDB. Closing or reloading the tab does not require another upload; both the site root and `upload.html` open the Dashboard with saved data. Use the Import Centre button or `upload.html?view=import` to add files. Browser storage belongs to the browser profile and website address used for the import.
 
 When the local Node server is running on the same PC, imports are also saved as JSON under `data/attendance/` and `data/employee_master.json`. The site loads and combines browser and server copies so records saved while the server was offline are still available. The page shows where each save succeeded. The `data/` and `backups/` folders remain ignored by Git and are not published on GitHub Pages.
 

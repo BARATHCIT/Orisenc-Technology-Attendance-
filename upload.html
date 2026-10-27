@@ -192,8 +192,10 @@
   const bulkProcessBtn = document.getElementById('bulkProcessBtn');
   const reportFrame = document.getElementById('reportFrame');
   const requestedPage = new URLSearchParams(location.search).get('view');
-  const landingPage = ['index.html', 'employee.html', 'dayview.html', 'reports.html'].includes(requestedPage) ? requestedPage : null;
+  const landingPage = requestedPage === 'import' ? null
+    : (['index.html', 'employee.html', 'dayview.html', 'reports.html'].includes(requestedPage) ? requestedPage : 'index.html');
   if (landingPage) {
+    document.title = 'Attendance Dashboard';
     document.getElementById('uploadApp').style.display = 'none';
     document.getElementById('landingLoading').style.display = 'flex';
     document.body.style.cssText = 'display:block;padding:0;';
