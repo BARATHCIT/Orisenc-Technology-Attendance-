@@ -1,10 +1,10 @@
 # Attendance Analysis
 
-A static web page for analysing Biometric and GreatHR attendance files. Open the [GitHub Pages app](https://barathcit.github.io/Orisenc-Technology-Attendance-/). You can select Biometric, GreatHR, and Employee Master together; the page checks the file columns, identifies each report, and shows record counts before analysis. The original separate upload fields are also available. After analysis, use the Dashboard, Employee Lookup, View by Date, and Reports pages. To use Team filters and absent reports, include the Employee Master file in the same session. Employee Master accepts either `Employee ID, Employee Name, Team` or `Emp ID, Name, Department` headings.
+A static web page for analysing Biometric and GreatHR attendance files. The [GitHub Pages app](https://barathcit.github.io/Orisenc-Technology-Attendance-/) opens on the Dashboard; use **Import Centre** to add data. You can select any one, two, or three of Biometric, GreatHR, and Employee Master together. The page identifies each selected file and shows record counts before analysis. Separate upload fields are also available. Only selected sources are imported; saved data from other sources remains. Team filters and absent reports use the Employee Master file. Employee Master accepts either `Employee ID, Employee Name, Team` or `Emp ID, Name, Department` headings.
 
 ## Data handling
 
-Imports are saved persistently in this browser using IndexedDB. Closing or reloading the tab does not require another upload; select **Open Dashboard** when saved data appears. Browser storage belongs to the browser profile and website address used for the import.
+Imports are saved persistently in this browser using IndexedDB. Closing or reloading the tab does not require another upload; the Dashboard opens with saved data. Browser storage belongs to the browser profile and website address used for the import.
 
 When the local Node server is running on the same PC, imports are also saved as JSON under `data/attendance/` and `data/employee_master.json`. The site loads and combines browser and server copies so records saved while the server was offline are still available. The page shows where each save succeeded. The `data/` and `backups/` folders remain ignored by Git and are not published on GitHub Pages.
 

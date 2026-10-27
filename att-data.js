@@ -86,7 +86,9 @@
     return window.parent !== window ? window.parent.AttSession : window.AttSession;
   }
   if (!session() && window.parent === window) {
-    location.replace('upload.html');
+    const page = location.pathname.split('/').pop() || 'index.html';
+    const allowed = ['index.html', 'employee.html', 'dayview.html', 'reports.html'];
+    location.replace('upload.html?view=' + encodeURIComponent(allowed.includes(page) ? page : 'index.html'));
   }
 
   // ── Intercept the existing report pages' JSON reads ─────────────────────

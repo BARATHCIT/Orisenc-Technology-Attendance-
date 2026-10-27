@@ -65,6 +65,7 @@
     .sync-status.synced{display:block;background:rgba(78,204,163,.1);border:1px solid rgba(78,204,163,.3);color:var(--success);}
     .sync-status.error{display:block;background:rgba(255,92,108,.1);border:1px solid rgba(255,92,108,.3);color:var(--danger);}
     #reportFrame{display:none;width:100%;height:100vh;border:0;}
+    #landingLoading{display:none;min-height:100vh;align-items:center;justify-content:center;color:var(--muted);font-weight:600;}
     .bulk-preview{display:none;margin-top:14px;font-size:13px;line-height:1.7;word-break:break-word;}
     .bulk-preview.show{display:block;}
     .bulk-preview strong{color:var(--text);}
@@ -81,13 +82,13 @@
   <a class="go-dashboard" id="localAppLink" href="http://127.0.0.1:5000/upload.html" style="display:none;margin:0 auto 20px">Open the local server version</a>
 
   <div class="card">
-    <div class="card-title">Upload all three files together</div>
-    <div class="card-hint">Select the Biometric, GreatHR, and Employee Master files together. The page checks their columns and shows which file is which before analysis.</div>
+    <div class="card-title">Upload files together</div>
+    <div class="card-hint">Select any one, two, or three of the Biometric, GreatHR, and Employee Master files. The page checks their columns and shows which file is which before analysis.</div>
     <div class="upload-zone" id="bulkZone">
       <input type="file" id="bulkFiles" accept=".xlsx,.xls" multiple>
       <span class="upload-icon">📂</span>
-      <div class="upload-label">Choose 3 files</div>
-      <div class="upload-hint">Biometric · GreatHR · Employee Master</div>
+      <div class="upload-label">Choose up to 3 files</div>
+      <div class="upload-hint">Any combination of Biometric · GreatHR · Employee Master</div>
       <div class="file-name" id="bulkFileName"></div>
     </div>
     <div class="bulk-preview" id="bulkPreview"></div>
@@ -97,7 +98,7 @@
 
   <div class="card">
     <div class="card-title">Upload files separately</div>
-    <div class="card-hint">The original upload fields are available below. Choose Biometric and GreatHR, then optionally Employee Master.</div>
+    <div class="card-hint">The original upload fields are available below. Select only the files you want to add or update.</div>
     <div class="cached-banner" id="cachedBanner"><span>✓</span><span>Saved attendance data is ready to view.</span></div>
     <button class="btn btn-secondary" id="goDash" style="display:none;margin-bottom:18px" onclick="showDashboard()">Open Dashboard</button>
 
@@ -120,7 +121,7 @@
     <div class="divider"></div>
 
     <button class="btn" id="processBtn" disabled onclick="processFiles()">
-      <span>Analyse Attendance</span>
+      <span>Analyse Selected Files</span>
     </button>
 
     <div class="progress-wrap" id="progressWrap">
@@ -130,9 +131,9 @@
       </div>
       <div class="progress-bar-bg"><div class="progress-bar" id="progressBar"></div></div>
       <div class="progress-steps">
-        <div class="step" id="step1"><div class="step-dot"></div>Reading Biometric file</div>
-        <div class="step" id="step2"><div class="step-dot"></div>Splitting Face vs Fingerprint</div>
-        <div class="step" id="step3"><div class="step-dot"></div>Reading GreatHR file</div>
+        <div class="step" id="step1"><div class="step-dot"></div>Reading selected Biometric file</div>
+        <div class="step" id="step2"><div class="step-dot"></div>Splitting Face vs Fingerprint when available</div>
+        <div class="step" id="step3"><div class="step-dot"></div>Reading selected GreatHR file</div>
         <div class="step" id="step4"><div class="step-dot"></div>Building daily summaries</div>
         <div class="step" id="step5"><div class="step-dot"></div>Building punch details</div>
         <div class="step" id="step6"><div class="step-dot"></div>Merging with existing data</div>
@@ -173,6 +174,7 @@
     <div class="error-msg" id="empErrorMsg"></div>
   </div>
   </div>
+  <div id="landingLoading">Loading attendance dashboard…</div>
   <iframe id="reportFrame" title="Attendance dashboard"></iframe>
 
   <script src="server-config.js?v=storage1"></script>
@@ -189,6 +191,13 @@
   const bulkInput = document.getElementById('bulkFiles');
   const bulkProcessBtn = document.getElementById('bulkProcessBtn');
   const reportFrame = document.getElementById('reportFrame');
+  const requestedPage = new URLSearchParams(location.search).get('view');
+  const landingPage = ['index.html', 'employee.html', 'dayview.html', 'reports.html'].includes(requestedPage) ? requestedPage : null;
+  if (landingPage) {
+    document.getElementById('uploadApp').style.display = 'none';
+    document.getElementById('landingLoading').style.display = 'flex';
+    document.body.style.cssText = 'display:block;padding:0;';
+  }
   window.AttSession = {
     att_face_summary: [], att_fingerprint_summary: [],
     att_ghr_summary: [], att_punch_details: [], master: []
@@ -217,12 +226,14 @@
       document.getElementById('cachedBanner').classList.add('show');
       document.getElementById('goDash').style.display = 'flex';
     }
+    if (landingPage) showDashboard(landingPage);
     return result;
   }).catch(error => {
     const status = document.getElementById('storageStatus');
     status.className = 'sync-status error';
     status.textContent = 'Could not load saved attendance: ' + error.message;
     console.error(error);
+    if (landingPage) showDashboard(landingPage);
   });
   async function connectLocalServer() {
     const button = document.getElementById('connectServerBtn');
@@ -262,12 +273,14 @@
     return '✓ Saved on the local Node server; browser storage unavailable';
   }
   function showDashboard(page = 'index.html') {
+    document.getElementById('landingLoading').style.display = 'none';
     document.getElementById('uploadApp').style.display = 'none';
     document.body.style.cssText = 'display:block;padding:0;';
     reportFrame.style.display = 'block';
     reportFrame.src = page;
   }
   function showUpload() {
+    document.getElementById('landingLoading').style.display = 'none';
     reportFrame.style.display = 'none';
     reportFrame.removeAttribute('src');
     document.getElementById('uploadApp').style.display = '';
@@ -291,8 +304,20 @@
   }
   setupZone(bioInput, document.getElementById('bioZone'), document.getElementById('bioFileName'), checkReady);
   setupZone(ghrInput, document.getElementById('ghrZone'), document.getElementById('ghrFileName'), checkReady);
-  setupZone(empInput, document.getElementById('empZone'), document.getElementById('empFileName'), () => { empBtn.disabled = !empInput.files[0]; });
-  function checkReady() { processBtn.disabled = !(bioInput.files[0] && ghrInput.files[0]); }
+  setupZone(empInput, document.getElementById('empZone'), document.getElementById('empFileName'), () => { empBtn.disabled = !empInput.files[0]; checkReady(); });
+  function checkReady() { processBtn.disabled = !(bioInput.files[0] || ghrInput.files[0] || empInput.files[0]); }
+
+  function clearSelectedFiles() {
+    for (const [input, zoneId, nameId] of [
+      [bioInput, 'bioZone', 'bioFileName'], [ghrInput, 'ghrZone', 'ghrFileName'], [empInput, 'empZone', 'empFileName']
+    ]) {
+      input.value = '';
+      document.getElementById(zoneId).classList.remove('done');
+      document.getElementById(nameId).textContent = '';
+    }
+    checkReady();
+    empBtn.disabled = true;
+  }
 
   function classifyWorkbook(workbook) {
     const sheets = workbook.SheetNames.map(name => workbook.Sheets[name]);
@@ -329,20 +354,10 @@
     error.classList.remove('show');
     document.getElementById('bulkZone').classList.remove('done');
     bulkProcessBtn.disabled = true;
-    if (bulkAssigned) {
-      for (const [input, zoneId, nameId] of [
-        [bioInput, 'bioZone', 'bioFileName'], [ghrInput, 'ghrZone', 'ghrFileName'], [empInput, 'empZone', 'empFileName']
-      ]) {
-        input.value = '';
-        document.getElementById(zoneId).classList.remove('done');
-        document.getElementById(nameId).textContent = '';
-      }
-      bulkAssigned = false;
-      checkReady();
-      empBtn.disabled = true;
-    }
-    if (files.length !== 3) {
-      error.textContent = 'Choose exactly 3 files: Biometric, GreatHR, and Employee Master.';
+    clearSelectedFiles();
+    bulkAssigned = false;
+    if (files.length < 1 || files.length > 3) {
+      error.textContent = 'Choose one, two, or three files. Use at most one of each report type.';
       error.classList.add('show');
       return;
     }
@@ -364,16 +379,15 @@
         if (!count) throw new Error(`${file.name}: no usable records were found.`);
         found[type] = { file, count };
       }
-      if (!found.bio || !found.ghr || !found.emp) throw new Error('The selection must contain one Biometric, one GreatHR, and one Employee Master file.');
       if (selection !== bulkSelection) return;
-      useFileForInput(bioInput, 'bioZone', 'bioFileName', found.bio.file);
-      useFileForInput(ghrInput, 'ghrZone', 'ghrFileName', found.ghr.file);
-      useFileForInput(empInput, 'empZone', 'empFileName', found.emp.file);
+      if (found.bio) useFileForInput(bioInput, 'bioZone', 'bioFileName', found.bio.file);
+      if (found.ghr) useFileForInput(ghrInput, 'ghrZone', 'ghrFileName', found.ghr.file);
+      if (found.emp) useFileForInput(empInput, 'empZone', 'empFileName', found.emp.file);
       document.getElementById('bulkZone').classList.add('done');
-      document.getElementById('bulkFileName').textContent = '✓ All 3 files identified';
+      document.getElementById('bulkFileName').textContent = `✓ ${files.length} file${files.length === 1 ? '' : 's'} identified`;
       const lines = [
         ['Biometric', found.bio], ['GreatHR', found.ghr], ['Employee Master', found.emp]
-      ];
+      ].filter(([, item]) => item);
       preview.replaceChildren(...lines.map(([label, item]) => {
         const line = document.createElement('div');
         const strong = document.createElement('strong');
@@ -382,7 +396,7 @@
         return line;
       }));
       checkReady();
-      empBtn.disabled = false;
+      empBtn.disabled = !found.emp;
       bulkAssigned = true;
       bulkProcessBtn.disabled = false;
     } catch (err) {
@@ -394,10 +408,12 @@
   }
   bulkInput.addEventListener('change', () => handleBulkFiles(Array.from(bulkInput.files)));
   [bioInput, ghrInput, empInput].forEach(input => input.addEventListener('change', () => {
+    bulkSelection++;
     bulkAssigned = false;
     bulkProcessBtn.disabled = true;
     document.getElementById('bulkZone').classList.remove('done');
     document.getElementById('bulkPreview').classList.remove('show');
+    checkReady();
   }));
   document.getElementById('bulkZone').addEventListener('dragover', event => event.preventDefault());
   document.getElementById('bulkZone').addEventListener('drop', event => {
@@ -664,7 +680,7 @@
     return merged;
   }
 
-  // ── Main process (Biometric + GreatHR, in memory) ─────────────────────────
+  // ── Process only the selected sources; keep all other saved data ──────────
   async function processFiles() {
     document.getElementById('progressWrap').classList.add('show');
     processBtn.disabled = true;
@@ -674,19 +690,25 @@
 
     try {
       await storageReady;
-      setStep(1,'active'); setProgress(5,'Reading Biometric file…');
-      const bioAB = await readFile(bioInput.files[0]);
-
-      setStep(1,'done'); setStep(2,'active'); setProgress(13,'Splitting Face vs Fingerprint…');
-      await tick();
-      const { faceRecords, fpRecords } = parseBiometric(bioAB);
-
-      setStep(2,'done'); setStep(3,'active'); setProgress(25,'Reading GreatHR file…');
-      const ghrAB = await readFile(ghrInput.files[0]);
-
+      const hasBio = !!bioInput.files[0];
+      const hasGHR = !!ghrInput.files[0];
+      const hasMaster = !!empInput.files[0];
+      if (!hasBio && !hasGHR && !hasMaster) throw new Error('Select at least one file to analyse.');
+      let faceRecords = [], fpRecords = [], ghrRecords = [];
+      if (hasBio) {
+        setStep(1,'active'); setProgress(5,'Reading Biometric file…');
+        const bioAB = await readFile(bioInput.files[0]);
+        setStep(1,'done'); setStep(2,'active'); setProgress(13,'Splitting Face vs Fingerprint…');
+        ({ faceRecords, fpRecords } = parseBiometric(bioAB));
+      }
+      setStep(1,'done'); setStep(2,'done');
+      if (hasGHR) {
+        setStep(3,'active'); setProgress(25,'Reading GreatHR file…');
+        const ghrAB = await readFile(ghrInput.files[0]);
+        ghrRecords = parseGreatHR(ghrAB);
+      }
       setStep(3,'done'); setStep(4,'active'); setProgress(36,'Building daily summaries…');
       await tick();
-      const ghrRecords = parseGreatHR(ghrAB);
       const faceSummary = buildSummary(faceRecords, 'User ID');
       const fpSummary   = buildSummary(fpRecords,   'User ID');
       const ghrSummary  = buildSummary(ghrRecords,  'Employee No');
@@ -719,14 +741,19 @@
         att_ghr_summary: mergedGHR,
         att_punch_details: mergedPunches
       };
-      if (empInput.files[0]) {
+      if (hasMaster) {
         const masterAB = await readFile(empInput.files[0]);
         const incomingMaster = parseEmployeeMaster(masterAB);
         nextSession.master = mergeEmployeeMaster(window.AttSession.master, incomingMaster);
       }
-      const saved = await window.AttStorage.save(nextSession);
+      const selectedKeys = [];
+      if (hasBio) selectedKeys.push('att_face_summary', 'att_fingerprint_summary');
+      if (hasGHR) selectedKeys.push('att_ghr_summary');
+      if (hasBio || hasGHR) selectedKeys.push('att_punch_details');
+      if (hasMaster) selectedKeys.push('master');
+      const saved = await window.AttStorage.save(nextSession, selectedKeys);
       Object.assign(window.AttSession, nextSession);
-      if (empInput.files[0]) setEmpSyncStatus('synced', `✓ Employee Master saved — ${nextSession.master.length} employees total`);
+      if (hasMaster) setEmpSyncStatus('synced', `✓ Employee Master saved — ${nextSession.master.length} employees total`);
 
       setStep(8,'done'); setProgress(100,'Done!');
       setSyncStatus('synced', savedMessage(saved));
@@ -739,6 +766,12 @@
       console.log(`✅ Great HR    : ${ghrSummary.length} new → ${mergedGHR.length} total`);
       console.log(`✅ Punches     : ${punchDetails.length} new → ${mergedPunches.length} total`);
 
+      clearSelectedFiles();
+      bulkInput.value = '';
+      bulkAssigned = false;
+      bulkProcessBtn.disabled = true;
+      document.getElementById('bulkZone').classList.remove('done');
+      document.getElementById('bulkPreview').classList.remove('show');
       await tick(1500);
       showDashboard();
 
@@ -751,7 +784,7 @@
         bulkError.classList.add('show');
       }
       setSyncStatus('error', '✗ Could not analyse the selected files');
-      processBtn.disabled = false;
+      checkReady();
       bulkProcessBtn.disabled = !bulkAssigned;
       console.error(err);
     }
