@@ -9,8 +9,20 @@
     ? '/api/employee-master'
     : '/api/attendance/' + encodeURIComponent(key);
   const serverBase = typeof SERVER_BASE_URL === 'string' ? SERVER_BASE_URL : '';
-  const loopbackOptions = location.hostname.endsWith('.github.io')
+  const needsLoopbackPermission = location.hostname.endsWith('.github.io');
+  const loopbackOptions = needsLoopbackPermission
     ? { targetAddressSpace: 'loopback' } : {};
+  let serverEnabled = !needsLoopbackPermission;
+
+  async function permissionState() {
+    if (!needsLoopbackPermission) return 'granted';
+    try {
+      return (await navigator.permissions.query({ name: 'loopback-network' })).state;
+    } catch (error) {
+      // Browsers without this permission query still connect on a user click.
+      return 'prompt';
+    }
+  }
 
   async function readBrowser(key) {
     const name = browserKey(key);
@@ -39,9 +51,9 @@
     }
   }
 
-  async function readServer(key) {
+  async function readServer(key, timeoutMs = 4000) {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 4000);
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
       const response = await fetch(serverBase + serverPath(key), {
         cache: 'no-store', signal: controller.signal, ...loopbackOptions
@@ -55,16 +67,25 @@
     }
   }
 
-  async function load(merge = {}) {
+  async function load(merge = {}, userRequested = false) {
+    // Start the permission-triggering request within the button's user gesture.
+    const requestedMaster = userRequested ? readServer('master', 60000) : null;
     const browser = await Promise.all(keys.map(readBrowser));
+    const permission = await permissionState();
     const server = keys.map(() => ({ status: 'rejected' }));
-    try {
-      const master = await readServer('master');
-      server[keys.indexOf('master')] = { status: 'fulfilled', value: master };
-      const attendance = await Promise.allSettled(attendanceKeys.map(readServer));
-      attendance.forEach((result, index) => { server[index] = result; });
-    } catch (error) {
-      console.warn('Local Node server read failed:', error);
+    if (userRequested || permission === 'granted') {
+      try {
+        const master = await (requestedMaster || readServer('master'));
+        server[keys.indexOf('master')] = { status: 'fulfilled', value: master };
+        const attendance = await Promise.allSettled(attendanceKeys.map(key =>
+          readServer(key, userRequested ? 30000 : 4000)));
+        attendance.forEach((result, index) => { server[index] = result; });
+        serverEnabled = server.every(result => result.status === 'fulfilled');
+      } catch (error) {
+        serverEnabled = false;
+        if (userRequested) throw error;
+        console.warn('Local Node server read failed:', error);
+      }
     }
     const data = {};
     keys.forEach((key, index) => {
@@ -81,7 +102,9 @@
     return {
       data,
       hasAttendance: attendanceKeys.some(key => data[key].length > 0),
-      serverAvailable: server.every(result => result.status === 'fulfilled')
+      serverAvailable: serverEnabled,
+      needsPermission: !serverEnabled && permission === 'prompt',
+      permissionDenied: !serverEnabled && permission === 'denied'
     };
   }
 
@@ -103,11 +126,15 @@
     const browser = await Promise.allSettled(selectedKeys.map(key =>
       writeBrowser(key, data[key])));
     let server = selectedKeys.map(() => ({ status: 'rejected' }));
-    try {
-      await readServer('master');
-      server = await Promise.allSettled(selectedKeys.map(key => writeServer(key, data[key])));
-    } catch (error) {
-      console.warn('Local Node server save is unavailable:', error);
+    if (serverEnabled) {
+      try {
+        await readServer('master');
+        server = await Promise.allSettled(selectedKeys.map(key => writeServer(key, data[key])));
+        if (server.some(result => result.status === 'rejected')) serverEnabled = false;
+      } catch (error) {
+        serverEnabled = false;
+        console.warn('Local Node server save is unavailable:', error);
+      }
     }
     const browserSaved = browser.every(result => result.status === 'fulfilled');
     const serverSaved = server.every(result => result.status === 'fulfilled');
@@ -117,5 +144,5 @@
     return { browserSaved, serverSaved };
   }
 
-  window.AttStorage = { load, save, attendanceKeys };
+  window.AttStorage = { load, connect: merge => load(merge, true), save, attendanceKeys };
 })();

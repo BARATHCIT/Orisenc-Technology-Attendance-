@@ -76,6 +76,8 @@
   <h1>Attendance Analysis</h1>
   <p class="subtitle">Choose attendance files to analyse. Saved records reopen in this browser, and are also saved to the local Node server when it is running on this PC.</p>
   <div class="sync-status syncing" id="storageStatus" style="margin:0 auto 20px;max-width:520px">Checking saved attendance data…</div>
+  <button class="btn btn-secondary" id="connectServerBtn" style="display:none;max-width:520px;margin:0 auto 12px" onclick="connectLocalServer()">Connect local server</button>
+  <p class="card-hint" id="serverHelp" style="display:none;max-width:520px;text-align:center;margin:0 auto 20px"></p>
 
   <div class="card">
     <div class="card-title">Upload all three files together</div>
@@ -174,7 +176,7 @@
 
   <script src="server-config.js?v=storage1"></script>
   <script src="browser-store.js?v=storage1"></script>
-  <script src="att-storage.js?v=storage2"></script>
+  <script src="att-storage.js?v=storage3"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script>
   // ── UI setup ──────────────────────────────────────────────────────────────
@@ -199,6 +201,14 @@
     status.textContent = result.hasAttendance
       ? `✓ Saved attendance loaded${result.serverAvailable ? ' · local server connected' : ' · browser copy available'}`
       : `No saved attendance yet${result.serverAvailable ? ' · local server connected' : ''}`;
+    if (!result.serverAvailable) {
+      document.getElementById('connectServerBtn').style.display = 'flex';
+      const help = document.getElementById('serverHelp');
+      help.style.display = 'block';
+      help.textContent = result.permissionDenied
+        ? 'Allow loopback access for this site in your browser settings to use the local Node server.'
+        : 'To load and save files on this PC’s Node server, click Connect local server and allow browser access. Browser saving works without it.';
+    }
     if (result.hasAttendance) {
       document.getElementById('cachedBanner').classList.add('show');
       document.getElementById('goDash').style.display = 'flex';
@@ -210,6 +220,35 @@
     status.textContent = 'Could not load saved attendance: ' + error.message;
     console.error(error);
   });
+  async function connectLocalServer() {
+    const button = document.getElementById('connectServerBtn');
+    const status = document.getElementById('storageStatus');
+    button.disabled = true;
+    status.className = 'sync-status syncing';
+    status.textContent = 'Connecting to the local Node server — allow browser access if prompted…';
+    try {
+      const result = await window.AttStorage.connect({
+        summary: mergeSummary, punches: mergePunches, master: mergeEmployeeMaster
+      });
+      if (!result.serverAvailable) throw new Error('The server did not return all attendance files.');
+      Object.assign(window.AttSession, result.data);
+      status.className = 'sync-status synced';
+      status.textContent = result.hasAttendance
+        ? '✓ Saved attendance loaded · local server connected'
+        : '✓ Local server connected · no saved attendance yet';
+      if (result.hasAttendance) {
+        document.getElementById('cachedBanner').classList.add('show');
+        document.getElementById('goDash').style.display = 'flex';
+      }
+      button.style.display = 'none';
+      document.getElementById('serverHelp').style.display = 'none';
+    } catch (error) {
+      status.className = 'sync-status error';
+      status.textContent = 'Local server connection failed. Browser saving is still available.';
+      console.warn('Local server connection failed:', error);
+      button.disabled = false;
+    }
+  }
   function savedMessage(result) {
     if (result.browserSaved && result.serverSaved) return '✓ Saved in this browser and on the local Node server';
     if (result.browserSaved) return '✓ Saved in this browser; local Node server unavailable';
