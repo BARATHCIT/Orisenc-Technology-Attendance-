@@ -337,9 +337,10 @@ tbody tr:hover .badge{
 </div><!-- /panel -->
 
 <script>
-let faceData=[], fpData=[], ghrData=[], allData=[], punchData=[];
+let faceData=[], fpData=[], ghrData=[], allData=[], combinedData=[], punchData=[];
 let teamLookup = {byId:{}, byName:{}};
 let punchIndex = new Map();
+let punchIdIndex = new Map(), punchNoIdNameIndex = new Map();
 let currentMode = "all";
 let panelContext = null; // {name, date, uid}
 let renderSequence = 0;
@@ -403,16 +404,56 @@ function punchKey(name, date){
 }
 function buildPunchIndex(){
   punchIndex = new Map();
+  punchIdIndex = new Map();
+  punchNoIdNameIndex = new Map();
   punchData.forEach(p=>{
     const date = (p.Date||"").toString().slice(0,10);
     const key = punchKey(p.Name, date);
     let rows = punchIndex.get(key);
     if(!rows){ rows=[]; punchIndex.set(key, rows); }
     rows.push(p);
+    const id = window.AttData.getPunchId(p);
+    const identityKey = id ? `${id}\u0000${date}` : `${(p.Name||'').trim().toLowerCase()}\u0000${date}`;
+    const index = id ? punchIdIndex : punchNoIdNameIndex;
+    if(!index.has(identityKey)) index.set(identityKey, []);
+    index.get(identityKey).push(p);
   });
 }
 function getPunchesForDay(name, date){
   return punchIndex.get(punchKey(name, date)) || [];
+}
+function buildCombinedData(){
+  const groups = new Map();
+  allData.forEach(row=>{
+    const date = String(row.Date||'').slice(0,10);
+    const rawId = row['User ID'] || row['Employee No'] || '';
+    const id = window.AttData.normalizeId(rawId);
+    const name = String(row.Name||'').trim().toLowerCase();
+    const key = `${date}\u0000${id ? 'id:'+id : 'name:'+name}`;
+    if(!groups.has(key)) groups.set(key, {...row, _idNorm:id, _names:new Set(), _modes:new Set()});
+    const group = groups.get(key);
+    group._names.add(name);
+    group._modes.add(row._mode);
+  });
+  combinedData = Array.from(groups.values());
+}
+function getCombinedPunches(row){
+  const date = String(row.Date||'').slice(0,10);
+  const punches = row._idNorm ? [...(punchIdIndex.get(`${row._idNorm}\u0000${date}`)||[])] : [];
+  for(const name of row._names){
+    punches.push(...(punchNoIdNameIndex.get(`${name}\u0000${date}`)||[]));
+  }
+  return punches;
+}
+function getCombinedTimes(row){
+  const punches = getCombinedPunches(row);
+  const times = punches.map(p=>String(p.Time||'')).filter(Boolean).sort();
+  const firstIn = times.length ? times[0].slice(0,5) : '—';
+  const lastOut = times.length > 1 ? times[times.length-1].slice(0,5) : '—';
+  const hours = times.length > 1
+    ? Math.round((Number(lastOut.slice(0,2))*60+Number(lastOut.slice(3,5))-Number(firstIn.slice(0,2))*60-Number(firstIn.slice(3,5)))/60*100)/100
+    : '—';
+  return {firstIn,lastOut,hours,totalPunches:punches.length,modePunches:punches.length};
 }
 
 /* ── Load data ── */
@@ -430,6 +471,7 @@ Promise.all([
     ...ghrData.map(r=>({...r,_mode:'greathr'}))
   ];
   buildPunchIndex();
+  buildCombinedData();
   populateTeamFilter();
   populateMonthFilter();
   selectLatestAttendanceDate();
@@ -468,7 +510,7 @@ function formatHours(hours){
     return `${hours.toFixed(1).replace(/\.0$/,"")}h`;
 }
 function currentData(){
-  if(currentMode==="all")         return allData;
+  if(currentMode==="all")         return combinedData;
   if(currentMode==="face")        return faceData;
   if(currentMode==="fingerprint") return fpData;
   return ghrData;
@@ -616,7 +658,7 @@ function render(){
   const enriched = data.map(r => {
     const date = (r.Date||"").toString().slice(0,10);
     const rowMode = currentMode==="all" ? r._mode : currentMode;
-    const times = getCrossModeTimes(r.Name, date, rowMode);
+    const times = currentMode==="all" ? getCombinedTimes(r) : getCrossModeTimes(r.Name, date, rowMode);
     const uidRaw = r["User ID"]||r["Employee No"]||"";
     const team = window.AttData ? window.AttData.getTeam(teamLookup, uidRaw, r.Name) : "";
     return { ...r, _source: rowMode, _firstIn: times.firstIn, _lastOut: times.lastOut, _hours: times.hours,
@@ -681,14 +723,16 @@ function render(){
     const [cls,label]=statusBadgeForDate(hoursNum, (r.Date||"").toString().slice(0,10));    const uid=r["User ID"]||r["Employee No"]||"";
     const safeDate=(r.Date||"").toString().slice(0,10);
     // Punch display: modePunches / totalPunches
-    const pnchHtml = `<span class="pnch-mode">${r._modePunches}</span><span class="pnch-sep">/</span><span class="pnch-total">${r._totalPunches}</span>`;
+    const pnchHtml = currentMode==="all"
+      ? `<span class="pnch-mode">${r._totalPunches}</span>`
+      : `<span class="pnch-mode">${r._modePunches}</span><span class="pnch-sep">/</span><span class="pnch-total">${r._totalPunches}</span>`;
     const teamHtml = r._team ? `<span class="team-pill">${r._team}</span>` : `<span style="color:var(--muted)">—</span>`;
     return`<tr onclick="openPanel('${(r.Name||"").replace(/'/g,"\\'")}','${safeDate}','${(uid).toString().replace(/'/g,"\\'")}')">
       <td>${pageStart+i+1}</td>
       <td class="emp-id-col">${uid||"—"}</td>
       <td><div class="emp">${r.Name||"—"}</div></td>
       <td>${teamHtml}</td>
-      <td>${sourcePill(r._source)}</td>
+      <td>${currentMode==="all" ? [...r._modes].map(sourcePill).join(' ') : sourcePill(r._source)}</td>
       <td><div class="date-val">${formatDate(r.Date)}</div></td>
       <td>${(()=>{const s=getLoginStatus(r._firstIn);return s?`<span style="color:${s.color};font-weight:600;cursor:default" title="${s.tooltip}">${window.AttData.formatTime12h(r._firstIn)}</span>`:`<span style="color:var(--muted)">—</span>`;})()}</td>
       <td class="t-out">${window.AttData.formatTime12h(r._lastOut)}</td>
@@ -721,13 +765,16 @@ function render(){
 
 /* ── Panel open — scoped to a single day ── */
 function openPanel(name, date, uid){
-  panelContext = {name, date, uid};
-
-  const allForDay = getPunchesForDay(name, date);
+  const combinedRow = currentMode === 'all' ? combinedData.find(r =>
+    String(r.Date||'').slice(0,10) === date && (uid
+      ? r._idNorm === window.AttData.normalizeId(uid)
+      : !r._idNorm && String(r.Name||'').trim().toLowerCase() === name.trim().toLowerCase())) : null;
+  const allForDay = combinedRow ? getCombinedPunches(combinedRow) : getPunchesForDay(name, date);
+  panelContext = {name, date, uid, punches:allForDay};
   const totalPunches = allForDay.length;
 
   const officialTimes = allForDay
-    .filter(p => p.Mode === "face" || p.Mode === "greathr")
+    .filter(p => combinedRow || p.Mode === "face" || p.Mode === "greathr")
     .map(p => p.Time).sort();
 
   const firstIn = officialTimes.length >= 2 ? officialTimes[0].slice(0,5) : officialTimes.length === 1 ? officialTimes[0].slice(0,5) : "—";
@@ -741,9 +788,13 @@ function openPanel(name, date, uid){
 
   // Which modes recorded this person on this day
   const modes=[];
-  if(faceData.some(r=>r.Name===name&&(r.Date||"").slice(0,10)===date))  modes.push(`<span class="mode-pill mode-face">👤 Face</span>`);
-  if(fpData.some(r=>r.Name===name&&(r.Date||"").slice(0,10)===date))    modes.push(`<span class="mode-pill mode-fp">🖐 Fingerprint</span>`);
-  if(ghrData.some(r=>r.Name===name&&(r.Date||"").slice(0,10)===date))   modes.push(`<span class="mode-pill mode-ghr">📱 Great HR</span>`);
+  if(combinedRow){
+    modes.push(...[...combinedRow._modes].map(sourcePill));
+  } else {
+    if(faceData.some(r=>r.Name===name&&(r.Date||"").slice(0,10)===date))  modes.push(`<span class="mode-pill mode-face">👤 Face</span>`);
+    if(fpData.some(r=>r.Name===name&&(r.Date||"").slice(0,10)===date))    modes.push(`<span class="mode-pill mode-fp">🖐 Fingerprint</span>`);
+    if(ghrData.some(r=>r.Name===name&&(r.Date||"").slice(0,10)===date))   modes.push(`<span class="mode-pill mode-ghr">📱 Great HR</span>`);
+  }
   document.getElementById("pe-modes").innerHTML=modes.join("");
 
   document.getElementById("ps-firstin").textContent  = window.AttData.formatTime12h(firstIn);
@@ -759,9 +810,7 @@ function openPanel(name, date, uid){
 /* ── Punch table — only for the selected day ── */
 function renderPunchTable(){
   if(!panelContext) return;
-  const {name, date} = panelContext;
-
-  let rows = getPunchesForDay(name, date).slice();
+  let rows = panelContext.punches.slice();
 
   rows.sort((a,b)=>a.Time.localeCompare(b.Time));
 
@@ -926,12 +975,8 @@ async function downloadExcel() {
 
         const date = (r.Date || "").slice(0,10);
 
-        const rowMode = currentMode === "all" ? r._mode : currentMode;
-        const times = getCrossModeTimes(
-            r.Name,
-            date,
-            rowMode
-        );
+        const rowMode = currentMode === "all" ? "all" : currentMode;
+        const times = rowMode === "all" ? getCombinedTimes(r) : getCrossModeTimes(r.Name, date, rowMode);
 
         const team = window.AttData.getTeam(
             teamLookup,
@@ -948,7 +993,8 @@ async function downloadExcel() {
             r["User ID"] || r["Employee No"] || "",
             r.Name,
             team,
-            rowMode === "face" ? "Face" : rowMode === "fingerprint" ? "Fingerprint" : "Great HR",
+            rowMode === "all" ? [...r._modes].map(m => m === "face" ? "Face" : m === "fingerprint" ? "Fingerprint" : "Great HR").join(" + ")
+              : rowMode === "face" ? "Face" : rowMode === "fingerprint" ? "Fingerprint" : "Great HR",
             date,
             times.firstIn,
             times.lastOut,
