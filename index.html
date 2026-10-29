@@ -153,17 +153,17 @@ tbody tr:hover .badge{
 /* ── Panel ── */
 .overlay{display:none;position:fixed;inset:0;background:var(--overlay);z-index:100;}
 .overlay.open{display:block;}
-.panel{position:fixed;top:0;right:-580px;width:560px;height:100vh;background:var(--panel-bg);border-left:1px solid var(--border);z-index:101;overflow-y:auto;transition:right .3s cubic-bezier(.4,0,.2,1);display:flex;flex-direction:column;}
+.panel{position:fixed;top:0;right:-480px;width:min(460px,100vw);height:100vh;background:var(--panel-bg);border-left:1px solid var(--border);z-index:101;overflow-y:auto;transition:right .3s cubic-bezier(.4,0,.2,1);display:flex;flex-direction:column;}
 .panel.open{right:0;}
-.panel-header{padding:20px 24px 16px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;justify-content:space-between;position:sticky;top:0;background:var(--panel-bg);z-index:1;}
+.panel-header{padding:16px 16px 12px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;justify-content:space-between;position:sticky;top:0;background:var(--panel-bg);z-index:1;}
 .panel-header h2{font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:700;}
 .ph-sub{font-size:13px;color:var(--muted);margin-top:3px;}
 .btn-close{width:32px;height:32px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--muted);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;line-height:1;flex-shrink:0;margin-left:12px;}
 .btn-close:hover{color:var(--text);border-color:var(--muted);}
-.panel-body{padding:20px 24px;flex:1;}
+.panel-body{padding:16px;flex:1;}
 
 /* emp card */
-.panel-emp-header{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px 18px;margin-bottom:14px;}
+.panel-emp-header{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:12px;}
 .panel-emp-name{font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:700;}
 .panel-emp-id{font-size:13px;color:var(--muted);margin-top:3px;}
 .panel-mode-pills{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;}
@@ -173,22 +173,23 @@ tbody tr:hover .badge{
 .mode-ghr{background:rgba(124,58,237,.15);color:#c084fc;}
 
 /* stat row */
-.panel-stat-row{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;}
-.panel-stat{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;text-align:center;}
+.panel-stat-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px;}
+.panel-stat{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 6px;text-align:center;}
 .ps-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;}
 .ps-val{font-size:20px;font-weight:700;margin-top:5px;}
 
 .panel-section-title{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;}
-.panel-day-label{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;color:var(--text);margin-bottom:14px;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;}
+.panel-day-label{font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:600;color:var(--text);margin-bottom:12px;padding:8px 10px;background:var(--surface);border:1px solid var(--border);border-radius:8px;}
 
 .panel-table-wrap{border:1px solid var(--border);border-radius:10px;overflow:hidden;}
-.panel-table{width:100%;border-collapse:collapse;font-size:13px;}
+.panel-table{width:100%;border-collapse:collapse;font-size:12px;}
 .panel-table thead tr{background:var(--th-bg);border-bottom:1px solid var(--border);}
-.panel-table thead th{padding:10px 12px;text-align:left;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;}
+.panel-table thead th{padding:8px 6px;text-align:left;font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;}
 .panel-table tbody tr{border-bottom:1px solid var(--border);}
 .panel-table tbody tr:last-child{border-bottom:none;}
 .panel-table tbody tr:hover{background:var(--row-hover);}
-.panel-table tbody td{padding:10px 12px;}
+.panel-table tbody td{padding:8px 6px;overflow-wrap:anywhere;}
+.panel-table tbody td:nth-child(2){white-space:nowrap;}
 .panel-foot{padding:8px 12px;background:var(--foot-bg);border-top:1px solid var(--border);font-size:12px;color:var(--muted);}
 
 .punch-in{color:var(--green);font-weight:600;}
