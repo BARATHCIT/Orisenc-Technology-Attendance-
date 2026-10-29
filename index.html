@@ -342,7 +342,7 @@ let teamLookup = {byId:{}, byName:{}};
 let punchIndex = new Map();
 let punchIdIndex = new Map(), punchNoIdNameIndex = new Map();
 let currentMode = "all";
-let panelContext = null; // {name, date, uid}
+let panelContext = null; // {name, date, uid, punches}
 let renderSequence = 0;
 let currentPage = 1;
 const PAGE_SIZE = 100;
@@ -769,13 +769,17 @@ function openPanel(name, date, uid){
     String(r.Date||'').slice(0,10) === date && (uid
       ? r._idNorm === window.AttData.normalizeId(uid)
       : !r._idNorm && String(r.Name||'').trim().toLowerCase() === name.trim().toLowerCase())) : null;
-  const allForDay = combinedRow ? getCombinedPunches(combinedRow) : getPunchesForDay(name, date);
-  panelContext = {name, date, uid, punches:allForDay};
-  const totalPunches = allForDay.length;
+  const identityRow = combinedRow || {
+    Date: date,
+    _idNorm: window.AttData.normalizeId(uid),
+    _names: new Set([name.trim().toLowerCase()])
+  };
+  const dayPunches = getCombinedPunches(identityRow);
+  const visiblePunches = currentMode === 'all' ? dayPunches : dayPunches.filter(p => p.Mode === currentMode);
+  panelContext = {name, date, uid, punches:visiblePunches};
+  const totalPunches = visiblePunches.length;
 
-  const officialTimes = allForDay
-    .filter(p => combinedRow || p.Mode === "face" || p.Mode === "greathr")
-    .map(p => p.Time).sort();
+  const officialTimes = visiblePunches.map(p => p.Time).filter(Boolean).sort();
 
   const firstIn = officialTimes.length >= 2 ? officialTimes[0].slice(0,5) : officialTimes.length === 1 ? officialTimes[0].slice(0,5) : "—";
   const lastOut = officialTimes.length >= 2 ? officialTimes[officialTimes.length - 1].slice(0,5) : "—";
@@ -786,15 +790,9 @@ function openPanel(name, date, uid){
   document.getElementById("pe-id").textContent=uid?"#"+uid:"No ID on record";
   document.getElementById("panel-day-label").textContent="📅 "+formatDateLong(date);
 
-  // Which modes recorded this person on this day
-  const modes=[];
-  if(combinedRow){
-    modes.push(...[...combinedRow._modes].map(sourcePill));
-  } else {
-    if(faceData.some(r=>r.Name===name&&(r.Date||"").slice(0,10)===date))  modes.push(`<span class="mode-pill mode-face">👤 Face</span>`);
-    if(fpData.some(r=>r.Name===name&&(r.Date||"").slice(0,10)===date))    modes.push(`<span class="mode-pill mode-fp">🖐 Fingerprint</span>`);
-    if(ghrData.some(r=>r.Name===name&&(r.Date||"").slice(0,10)===date))   modes.push(`<span class="mode-pill mode-ghr">📱 Great HR</span>`);
-  }
+  const modes = currentMode === 'all'
+    ? [...new Set(visiblePunches.map(p => p.Mode))].map(sourcePill)
+    : [sourcePill(currentMode)];
   document.getElementById("pe-modes").innerHTML=modes.join("");
 
   document.getElementById("ps-firstin").textContent  = window.AttData.formatTime12h(firstIn);
