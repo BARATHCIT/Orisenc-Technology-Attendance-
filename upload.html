@@ -279,7 +279,8 @@
     document.getElementById('uploadApp').style.display = 'none';
     document.body.style.cssText = 'display:block;padding:0;';
     reportFrame.style.display = 'block';
-    reportFrame.src = page;
+    const separator = page.includes('?') ? '&' : '?';
+    reportFrame.src = `${page}${separator}v=panel560`;
   }
   function showUpload() {
     document.getElementById('landingLoading').style.display = 'none';
