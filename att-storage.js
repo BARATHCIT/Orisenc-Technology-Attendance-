@@ -73,7 +73,9 @@
     const browser = await Promise.all(keys.map(readBrowser));
     const permission = await permissionState();
     const server = keys.map(() => ({ status: 'rejected' }));
-    if (userRequested || permission === 'granted') {
+    // GitHub Pages works fully from browser storage. Only contact the local
+    // Node server there after the user explicitly clicks Connect local server.
+    if (userRequested || (!needsLoopbackPermission && permission === 'granted')) {
       try {
         const master = await (requestedMaster || readServer('master'));
         server[keys.indexOf('master')] = { status: 'fulfilled', value: master };

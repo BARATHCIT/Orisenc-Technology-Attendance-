@@ -1123,7 +1123,6 @@ async function generateReport(){
     document.getElementById("resultsTitle").textContent=title;
     document.getElementById("resultsSection").style.display="";
     document.getElementById("idleHint").style.display="none";
-    document.getElementById("btnExport").style.display="";
     document.getElementById("resSearch").value="";
 
     renderReportInfoHeader(title);
@@ -1301,7 +1300,6 @@ async function generateReport(){
   document.getElementById("resultsTitle").textContent=title;
   document.getElementById("resultsSection").style.display="";
   document.getElementById("idleHint").style.display="none";
-  document.getElementById("btnExport").style.display="";
   document.getElementById("resSearch").value="";
 
   renderReportInfoHeader(title);
@@ -1623,7 +1621,6 @@ function clearAll(){
   document.getElementById("thresholdRow").style.display="none";
   document.getElementById("resultsSection").style.display="none";
   document.getElementById("idleHint").style.display="";
-  document.getElementById("btnExport").style.display="none";
   document.getElementById("btnGenerate").disabled=true;
   reportRows=[];filteredRows=[];currentReportType="";
   sortState={column:'date',direction:'desc'};
